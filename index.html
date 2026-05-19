@@ -1201,7 +1201,19 @@
       btnStop.style.display = "block";
       focusBox.className = "focus-box scanning";
 
-      html5QrScanner = new Html5Qrcode("reader");
+      try {
+        html5QrScanner = new Html5Qrcode("reader", {
+          formatsToSupport: [
+            Html5QrcodeSupportedFormats.EAN_13,
+            Html5QrcodeSupportedFormats.EAN_8,
+            Html5QrcodeSupportedFormats.UPC_A,
+            Html5QrcodeSupportedFormats.UPC_E,
+            Html5QrcodeSupportedFormats.CODE_128
+          ]
+        });
+      } catch (e) {
+        html5QrScanner = new Html5Qrcode("reader");
+      }
 
       const config = {
         fps: 15,
@@ -1212,8 +1224,16 @@
         aspectRatio: 1.0
       };
 
+      const mediaConstraints = cameraId ? {
+        deviceId: { exact: cameraId }
+      } : {
+        facingMode: "environment",
+        width: { min: 640, ideal: 1280, max: 1920 },
+        height: { min: 480, ideal: 720, max: 1080 }
+      };
+
       html5QrScanner.start(
-        cameraId ? { deviceId: { exact: cameraId } } : { facingMode: "environment" },
+        mediaConstraints,
         config,
         (decodedText, decodedResult) => {
           // Debounce scans to prevent reading same barcode 100 times in 1 second
