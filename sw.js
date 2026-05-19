@@ -1,7 +1,8 @@
-const CACHE_NAME = 'aa-scanner-v1';
+const CACHE_NAME = 'aa-scanner-v2';
 const urlsToCache = [
   './index.html',
-  './manifest.json'
+  './manifest.json',
+  './assets/logo.png'
 ];
 
 self.addEventListener('install', event => {
