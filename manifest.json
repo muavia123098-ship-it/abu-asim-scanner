@@ -1,0 +1,17 @@
+{
+  "name": "Abu Asim Scanner",
+  "short_name": "AA Scanner",
+  "start_url": "./index.html",
+  "display": "standalone",
+  "background_color": "#09090b",
+  "theme_color": "#d4af37",
+  "orientation": "portrait",
+  "icons": [
+    {
+      "src": "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdib3g9IjAgMCAxMDAgMTAwIj48cmVjdCB3aWR0aD0iMTAwIiBoZWlnaHQ9IjEwMCIgZmlsbD0iIzA5MDkwYiIvPjx0ZXh0IHk9IjYwIiB4PSI1MCIgZm9udC1zaXplPSI1MCIgZmlsbD0iI2Q0YWYzNyIgZm9udC1mYW1pbHk9InNhbnMtc2VyaWYiIHRleHQtYW5jaG9yPSJtaWRkbGUiPkFBPC90ZXh0Pjwvc3ZnPg==",
+      "sizes": "512x512",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}
