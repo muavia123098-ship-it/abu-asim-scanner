@@ -736,7 +736,7 @@
       <div class="splash-ring"></div>
       <div class="splash-ring-inner"></div>
       <div class="splash-logo-circle">
-        <span class="splash-monogram">AA</span>
+        <img src="./logo.png" alt="Abu Asim Logo" style="width:65px; height:65px; object-fit:contain; border-radius:50%;">
       </div>
     </div>
 
@@ -756,10 +756,9 @@
   <div id="passkeyScreen">
     <div class="passkey-title">Enter Passkey</div>
     <div class="form-group" style="width: 100%; max-width: 300px; margin-bottom: 20px;">
-      <input type="password" id="passkeyInput" placeholder="Password" style="text-align: center; font-size: 1.2rem; padding: 15px; letter-spacing: 2px;">
+      <input type="password" id="passkeyInput" placeholder="••••••••••" style="text-align: center; font-size: 1.2rem; padding: 15px; letter-spacing: 2px;">
     </div>
     <button class="btn" id="btnUnlock" style="width: 100%; max-width: 300px;">Unlock App</button>
-    <div style="margin-top:20px; color:var(--text-muted); font-size:0.8rem">Default: AbuAsim786</div>
   </div>
 
   <div class="ambient-glow"></div>
@@ -771,9 +770,13 @@
       <h1>Abu Asim</h1>
       <p>Wireless Mobile Scanner</p>
     </div>
-    <div class="status-badge offline" id="connectionBadge">
-      <div class="status-dot"></div>
-      <span id="connectionText">Offline</span>
+    <div style="display: flex; align-items: center; gap: 10px;">
+      <div class="status-badge offline" id="connectionBadge">
+        <div class="status-dot"></div>
+        <span id="connectionText">Offline</span>
+      </div>
+      <!-- Lock Button -->
+      <button id="btnLock" title="Lock App" style="background: rgba(255,255,255,0.05); border: 1px solid rgba(212,175,55,0.3); color: var(--primary); width: 36px; height: 36px; border-radius: 50%; cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 1rem; transition: all 0.2s;">🔒</button>
     </div>
   </header>
 
@@ -924,7 +927,7 @@
     function checkPin() {
       if(passkeyInput.value === CORRECT_PIN) {
         passkeyScreen.classList.add('hidden');
-        localStorage.setItem('scanner_unlocked', Date.now()); // Save unlock time
+        localStorage.setItem('scanner_unlocked', 'true'); // Permanent unlock
       } else {
         passkeyInput.classList.add('error-shake');
         if("vibrate" in navigator) navigator.vibrate(200); // Error vibration
@@ -939,10 +942,20 @@
       if(e.key === 'Enter') checkPin();
     });
 
-    // Check if already unlocked (valid for 12 hours)
-    const unlockedTime = localStorage.getItem('scanner_unlocked');
-    if(unlockedTime && (Date.now() - parseInt(unlockedTime)) < 12 * 60 * 60 * 1000) {
+    // Check if already unlocked (PERMANENTLY - no expiry)
+    const isUnlocked = localStorage.getItem('scanner_unlocked');
+    if(isUnlocked === 'true') {
       passkeyScreen.classList.add('hidden');
+    }
+
+    // Lock button — clears unlock & shows passkey screen again
+    const btnLock = document.getElementById('btnLock');
+    if(btnLock) {
+      btnLock.addEventListener('click', () => {
+        localStorage.removeItem('scanner_unlocked');
+        passkeyInput.value = '';
+        passkeyScreen.classList.remove('hidden');
+      });
     }
 
     // --- Dynamic Beep Sound using Web Audio API (No audio file needed!) ---
