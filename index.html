@@ -494,12 +494,16 @@
       font-weight: 700;
       font-size: 0.85rem;
       box-shadow: 0 10px 20px rgba(34, 197, 94, 0.3);
-      transition: transform 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+      transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
       z-index: 100;
+      opacity: 0;
+      visibility: hidden;
     }
     
     .scan-toast.active {
       transform: translateX(-50%) translateY(0);
+      opacity: 1;
+      visibility: visible;
     }
 
     /* ─────────────── SPLASH SCREEN ─────────────── */
@@ -813,13 +817,21 @@
         <div class="status-dot"></div>
         <span id="connectionText">Offline</span>
       </div>
+      <!-- Settings Button -->
+      <button id="btnOpenConfig" title="Database Config" style="background: rgba(255,255,255,0.05); border: 1px solid rgba(212,175,55,0.3); color: var(--primary); width: 36px; height: 36px; border-radius: 50%; cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 1rem; transition: all 0.2s;">⚙️</button>
       <!-- Lock Button -->
       <button id="btnLock" title="Lock App" style="background: rgba(255,255,255,0.05); border: 1px solid rgba(212,175,55,0.3); color: var(--primary); width: 36px; height: 36px; border-radius: 50%; cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 1rem; transition: all 0.2s;">🔒</button>
     </div>
   </header>
 
+  <!-- Tab Mode Selector -->
+  <div style="display: flex; gap: 6px; background: rgba(255,255,255,0.02); border: 1px solid var(--border-glass); border-radius: 14px; padding: 3px; margin-bottom: 16px; z-index: 10;">
+    <button id="tabScanner" style="flex: 1; padding: 10px; border: none; border-radius: 10px; font-size: 0.85rem; font-weight: 700; cursor: pointer; background: var(--primary); color: #121212; transition: all 0.2s;">🔍 Barcode Scanner</button>
+    <button id="tabPos" style="flex: 1; padding: 10px; border: none; border-radius: 10px; font-size: 0.85rem; font-weight: 700; cursor: pointer; background: transparent; color: var(--text-muted); transition: all 0.2s;">💼 POS Cashier</button>
+  </div>
+
   <!-- Main Panel -->
-  <div class="panel">
+  <div class="panel" id="scannerPanel">
     
     <!-- Viewfinder -->
     <div class="scanner-container">
@@ -853,7 +865,7 @@
   </div>
 
   <!-- Session Link Setup Panel -->
-  <div class="panel">
+  <div class="panel" id="linkingPanel">
     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
       <h2 class="scans-title" style="margin-bottom: 0;">Setup Connection</h2>
       <button class="btn btn-secondary" id="btnInstall" style="display: none; padding: 6px 12px; font-size: 0.75rem; border-radius: 8px;">+ Add to Home</button>
@@ -878,7 +890,7 @@
   </div>
 
   <!-- Recent Scans log -->
-  <div class="panel" style="flex: 1; min-height: 180px;">
+  <div class="panel" id="recentScansPanel" style="flex: 1; min-height: 180px;">
     <h2 class="scans-title">
       <span>Recent Scans</span>
       <span style="font-size: 0.65rem; color: var(--text-muted);" id="scanCount">Total: 0</span>
@@ -887,6 +899,87 @@
       <div style="text-align: center; color: var(--text-muted); font-size: 0.8rem; padding: 20px 0;" id="emptyListMsg">
         No recent scans. Ready to capture!
       </div>
+    </div>
+  </div>
+
+  <!-- Mobile POS Cashier Panel -->
+  <div class="panel" id="posPanel" style="display: none; flex: 1;">
+    <h2 class="scans-title">
+      <span>POS Cashier</span>
+      <span style="font-size: 0.75rem; color: var(--text-muted);" id="posStatusText">Not Connected</span>
+    </h2>
+    
+    <!-- Product Catalog Search -->
+    <div class="form-group" style="margin-bottom: 8px;">
+      <label for="posSearch">Search Synced Catalog</label>
+      <input type="text" id="posSearch" placeholder="Search product name or brand...">
+    </div>
+    
+    <!-- Product List -->
+    <div style="max-height: 220px; overflow-y: auto; display: flex; flex-direction: column; gap: 8px; margin-bottom: 12px; border-bottom: 1.5px solid var(--border-glass); padding-bottom: 10px;" id="posProductsList">
+      <div style="text-align: center; color: var(--text-muted); font-size: 0.8rem; padding: 20px 0;">
+        Waiting for laptop connection to sync products...
+      </div>
+    </div>
+
+    <!-- Mobile POS Cart -->
+    <h2 class="scans-title" style="margin-bottom: 4px;">
+      <span>Mobile POS Cart</span>
+      <span style="font-size: 0.75rem; color: var(--text-muted);" id="posCartCount">Items: 0</span>
+    </h2>
+    <div style="max-height: 200px; overflow-y: auto; display: flex; flex-direction: column; gap: 8px; margin-bottom: 16px; border-bottom: 1.5px solid var(--border-glass); padding-bottom: 10px;" id="posCartList">
+      <div style="text-align: center; color: var(--text-muted); font-size: 0.8rem; padding: 20px 0;" id="posEmptyCartMsg">
+        Cart is empty. Tap products above to add!
+      </div>
+    </div>
+
+    <!-- Checkout Details Slide-up -->
+    <div style="background: rgba(255,255,255,0.02); padding: 12px; border-radius: 16px; border: 1px solid rgba(255,255,255,0.05); display: flex; flex-direction: column; gap: 10px;">
+      <div style="display: flex; gap: 8px; justify-content: space-between; align-items: center;">
+        <span style="font-size: 0.8rem; font-weight: bold; color: var(--primary);">Customer</span>
+        <button type="button" id="btnPosWalkIn" style="font-size: 0.7rem; background: var(--primary); color: black; border: none; padding: 3px 8px; border-radius: 6px; cursor: pointer; font-weight: bold;">Walk-in</button>
+      </div>
+      <div style="display: grid; grid-template-columns: 1.2fr 1fr; gap: 8px;">
+        <input type="text" id="posCustName" placeholder="Customer Name" style="padding: 8px; font-size: 0.8rem;">
+        <input type="tel" id="posCustPhone" placeholder="Phone Number" style="padding: 8px; font-size: 0.8rem;">
+      </div>
+      
+      <div style="display: grid; grid-template-columns: 1fr 1.2fr; gap: 8px; margin-top: 4px;">
+        <div>
+          <label style="font-size: 0.65rem; color: var(--text-muted);">Discount (PKR)</label>
+          <input type="number" id="posDiscount" placeholder="0" style="padding: 8px; font-size: 0.8rem;" value="0">
+        </div>
+        <div>
+          <label style="font-size: 0.65rem; color: var(--text-muted);" id="posAmountPaidLabel">Amount Paid (PKR)</label>
+          <input type="number" id="posAmountPaid" placeholder="0" style="padding: 8px; font-size: 0.8rem;">
+        </div>
+      </div>
+
+      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 4px;">
+        <div>
+          <label style="font-size: 0.65rem; color: var(--text-muted);">Payment Method</label>
+          <div style="display: flex; gap: 4px; background: rgba(255,255,255,0.03); padding: 2px; border-radius: 8px;">
+            <button type="button" id="btnPosPayCash" style="flex: 1; padding: 6px; font-size: 0.7rem; border: none; border-radius: 6px; cursor: pointer; background: var(--primary); color: black; font-weight: bold;">Cash</button>
+            <button type="button" id="btnPosPayBank" style="flex: 1; padding: 6px; font-size: 0.7rem; border: none; border-radius: 6px; cursor: pointer; background: transparent; color: var(--text-muted);">Bank</button>
+          </div>
+        </div>
+        <div>
+          <label style="font-size: 0.65rem; color: var(--text-muted);">Sale Type</label>
+          <div style="display: flex; gap: 4px; background: rgba(255,255,255,0.03); padding: 2px; border-radius: 8px;">
+            <button type="button" id="btnPosTypePhysical" style="flex: 1; padding: 6px; font-size: 0.7rem; border: none; border-radius: 6px; cursor: pointer; background: var(--primary); color: black; font-weight: bold;">Physical</button>
+            <button type="button" id="btnPosTypeOnline" style="flex: 1; padding: 6px; font-size: 0.7rem; border: none; border-radius: 6px; cursor: pointer; background: transparent; color: var(--text-muted);">Online</button>
+          </div>
+        </div>
+      </div>
+
+      <div style="display: flex; justify-content: space-between; font-size: 1.1rem; font-weight: 800; border-top: 1px dashed rgba(255,255,255,0.1); padding-top: 10px; margin-top: 4px;">
+        <span>Payable Total:</span>
+        <span style="color: var(--primary);" id="posTotalText">PKR 0</span>
+      </div>
+
+      <button type="button" class="btn" id="btnPosCheckout" style="width: 100%; padding: 12px; margin-top: 6px;">
+        Complete POS Sale
+      </button>
     </div>
   </div>
 
@@ -917,6 +1010,52 @@
       <div style="display: flex; gap: 8px;">
         <button class="btn" id="btnSaveConfig" style="flex: 1.2;">Save Config</button>
         <button class="btn btn-secondary" id="btnCancelConfig" style="flex: 1;">Use Demo</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Remote Invoice Completed Modal -->
+  <div class="modal" id="invoiceModal">
+    <div class="modal-content" style="max-width: 380px; text-align: left; background: #ffffff; color: #000000; border: none; padding: 24px; font-family: 'Plus Jakarta Sans', sans-serif;">
+      <h2 style="text-align: center; margin: 0 0 10px 0; font-weight: 800; font-size: 18px; color: #000000; letter-spacing: 0.5px;">ABU ASIM DIGITAL RECEIPT</h2>
+      <div style="text-align: center; font-size: 10px; color: #956e36; letter-spacing: 1.5px; text-transform: uppercase; font-weight: bold; margin-top: -8px; margin-bottom: 12px;">Perfumery</div>
+      
+      <div style="font-size: 11px; border-bottom: 1px solid #ddd; padding-bottom: 6px; margin-bottom: 12px; display: flex; flex-direction: column; gap: 2px; color: #000000;">
+        <div><b>Customer Name:</b> <span id="invCustName">Walk-in</span></div>
+        <div><b>Date:</b> <span id="invDate">May 24, 2026</span></div>
+        <div><b>Invoice ID:</b> <span id="invId">#A832B</span></div>
+      </div>
+      
+      <table style="width: 100%; border-collapse: collapse; margin-bottom: 12px; font-size: 11px; color: #000000;">
+        <thead>
+          <tr style="border-bottom: 1.5px solid #000000; text-align: left; font-weight: 800;">
+            <th style="padding: 4px 0;">Item</th>
+            <th style="padding: 4px 0; text-align: center;">Qty</th>
+            <th style="padding: 4px 0; text-align: right;">Total</th>
+          </tr>
+        </thead>
+        <tbody id="invItemsBody">
+          <!-- Dynamic Items -->
+        </tbody>
+      </table>
+
+      <div style="text-align: right; border-top: 1.5px solid #000000; padding-top: 6px; display: flex; flex-direction: column; gap: 3px; font-size: 12px; color: #000000;">
+        <div style="display: flex; justify-content: space-between;"><span style="color: #444;">Subtotal:</span><span id="invSubtotal">PKR 0</span></div>
+        <div style="display: flex; justify-content: space-between;" id="invDiscountRow"><span style="color: #444;">Discount:</span><span id="invDiscount">-PKR 0</span></div>
+        <div style="display: flex; justify-content: space-between; font-weight: 800; font-size: 13px; border-top: 1px dashed #ddd; padding-top: 4px;" class="grand-total">
+          <span>Grand Total:</span><span id="invTotal">PKR 0</span>
+        </div>
+        <div style="display: flex; justify-content: space-between;"><span style="color: #444;">Received:</span><span id="invReceived">PKR 0</span></div>
+        <div style="display: flex; justify-content: space-between; font-weight: 800;"><span id="invBalanceLabel">Baqaya (Change):</span><span id="invBalance">PKR 0</span></div>
+      </div>
+
+      <div style="display: flex; gap: 8px; margin-top: 20px;">
+        <button type="button" class="btn" id="btnPosWhatsApp" style="flex: 1.2; background: #25D366; color: #ffffff; box-shadow: 0 4px 15px rgba(37, 211, 102, 0.25);">
+          WhatsApp Share
+        </button>
+        <button type="button" class="btn btn-secondary" id="btnPosCloseInvoice" style="flex: 1; border: 1px solid #ddd; color: #000; background: #f4f4f5;">
+          New Sale
+        </button>
       </div>
     </div>
   </div>
@@ -964,6 +1103,7 @@
 
     function checkPin() {
       if(passkeyInput.value === CORRECT_PIN) {
+        passkeyInput.blur(); // Dismiss virtual mobile keyboard
         passkeyScreen.classList.add('hidden');
         localStorage.setItem('scanner_unlocked', 'true'); // Permanent unlock
       } else {
@@ -1151,6 +1291,31 @@
           updateStatus('ready', "Waiting for Laptop");
         }
       });
+
+      // Listen to product catalog updates synced from laptop
+      firebaseDb.ref(`sessions/${sessionId}/products`).on('value', (snapshot) => {
+        syncedProducts = snapshot.val() || [];
+        const posStatusText = document.getElementById("posStatusText");
+        if (posStatusText) posStatusText.innerText = "Linked: " + syncedProducts.length + " Products";
+        renderPosProducts();
+      });
+
+      // Listen to mobile checkout transaction complete responses
+      firebaseDb.ref(`sessions/${sessionId}/mobile_sale_result`).on('value', (snapshot) => {
+        const result = snapshot.val();
+        if (!result || !result.timestamp || result.timestamp <= lastSaleResultTimestamp) return;
+        lastSaleResultTimestamp = result.timestamp;
+        
+        updatePosCheckoutButtonState(false);
+        
+        if (result.success) {
+          playBeepSound();
+          if (navigator.vibrate) navigator.vibrate([100, 50, 100]);
+          showMobileInvoice(result);
+        } else {
+          alert("Checkout failed: " + (result.error || "Unknown error"));
+        }
+      });
     }
 
     btnLink.addEventListener('click', () => {
@@ -1240,14 +1405,16 @@
       btnStop.style.display = "block";
       focusBox.className = "focus-box scanning";
 
+      const formats = window.Html5QrcodeSupportedFormats ? [
+        Html5QrcodeSupportedFormats.EAN_13,
+        Html5QrcodeSupportedFormats.EAN_8,
+        Html5QrcodeSupportedFormats.CODE_128,
+        Html5QrcodeSupportedFormats.QR_CODE
+      ] : [];
+
       try {
         html5QrScanner = new Html5Qrcode("reader", {
-          formatsToSupport: [
-            Html5QrcodeSupportedFormats.EAN_13,
-            Html5QrcodeSupportedFormats.EAN_8,
-            Html5QrcodeSupportedFormats.CODE_128,
-            Html5QrcodeSupportedFormats.QR_CODE
-          ]
+          formatsToSupport: formats
         });
       } catch (e) {
         html5QrScanner = new Html5Qrcode("reader");
@@ -1357,6 +1524,526 @@
         }
       }
     });
+
+    // --- Mobile POS Cashier Logic ---
+    let syncedProducts = [];
+    let posCart = [];
+    let isPosCheckoutLoading = false;
+    let lastSaleResultTimestamp = 0;
+    let selectedPosCustomer = { name: "", phone: "", id: "" };
+    let posPaymentMethod = "Cash";
+    let posSaleType = "Physical";
+
+    const tabScanner = document.getElementById("tabScanner");
+    const tabPos = document.getElementById("tabPos");
+    const posPanel = document.getElementById("posPanel");
+    const scannerPanel = document.getElementById("scannerPanel");
+    const linkingPanel = document.getElementById("linkingPanel");
+    const recentScansPanel = document.getElementById("recentScansPanel");
+
+    const posSearch = document.getElementById("posSearch");
+    const posProductsList = document.getElementById("posProductsList");
+    const posCartList = document.getElementById("posCartList");
+    const posEmptyCartMsg = document.getElementById("posEmptyCartMsg");
+    const posCartCount = document.getElementById("posCartCount");
+    const posTotalText = document.getElementById("posTotalText");
+    const btnPosCheckout = document.getElementById("btnPosCheckout");
+
+    const posCustName = document.getElementById("posCustName");
+    const posCustPhone = document.getElementById("posCustPhone");
+    const btnPosWalkIn = document.getElementById("btnPosWalkIn");
+    const posDiscount = document.getElementById("posDiscount");
+    const posAmountPaid = document.getElementById("posAmountPaid");
+    const posAmountPaidLabel = document.getElementById("posAmountPaidLabel");
+
+    const btnPosPayCash = document.getElementById("btnPosPayCash");
+    const btnPosPayBank = document.getElementById("btnPosPayBank");
+    const btnPosTypePhysical = document.getElementById("btnPosTypePhysical");
+    const btnPosTypeOnline = document.getElementById("btnPosTypeOnline");
+
+    // Modal Receipt elements
+    const invoiceModal = document.getElementById("invoiceModal");
+    const invCustName = document.getElementById("invCustName");
+    const invDate = document.getElementById("invDate");
+    const invId = document.getElementById("invId");
+    const invItemsBody = document.getElementById("invItemsBody");
+    const invSubtotal = document.getElementById("invSubtotal");
+    const invDiscountRow = document.getElementById("invDiscountRow");
+    const invDiscount = document.getElementById("invDiscount");
+    const invTotal = document.getElementById("invTotal");
+    const invReceived = document.getElementById("invReceived");
+    const invBalanceLabel = document.getElementById("invBalanceLabel");
+    const invBalance = document.getElementById("invBalance");
+    const btnPosWhatsApp = document.getElementById("btnPosWhatsApp");
+    const btnPosCloseInvoice = document.getElementById("btnPosCloseInvoice");
+
+    // Toggle Payment Method
+    btnPosPayCash.onclick = () => {
+      posPaymentMethod = "Cash";
+      btnPosPayCash.style.background = "var(--primary)";
+      btnPosPayCash.style.color = "black";
+      btnPosPayCash.style.fontWeight = "bold";
+      btnPosPayBank.style.background = "transparent";
+      btnPosPayBank.style.color = "var(--text-muted)";
+    };
+    btnPosPayBank.onclick = () => {
+      posPaymentMethod = "Bank";
+      btnPosPayBank.style.background = "var(--primary)";
+      btnPosPayBank.style.color = "black";
+      btnPosPayBank.style.fontWeight = "bold";
+      btnPosPayCash.style.background = "transparent";
+      btnPosPayCash.style.color = "var(--text-muted)";
+    };
+
+    // Toggle Sale Type
+    btnPosTypePhysical.onclick = () => {
+      posSaleType = "Physical";
+      btnPosTypePhysical.style.background = "var(--primary)";
+      btnPosTypePhysical.style.color = "black";
+      btnPosTypePhysical.style.fontWeight = "bold";
+      btnPosTypeOnline.style.background = "transparent";
+      btnPosTypeOnline.style.color = "var(--text-muted)";
+    };
+    btnPosTypeOnline.onclick = () => {
+      posSaleType = "Online";
+      btnPosTypeOnline.style.background = "var(--primary)";
+      btnPosTypeOnline.style.color = "black";
+      btnPosTypeOnline.style.fontWeight = "bold";
+      btnPosTypePhysical.style.background = "transparent";
+      btnPosTypePhysical.style.color = "var(--text-muted)";
+    };
+
+    // Walk-in Customer Shortcut
+    btnPosWalkIn.onclick = () => {
+      selectedPosCustomer = { name: "Walk-in Customer", phone: "Guest", id: "guest" };
+      posCustName.value = "Walk-in Customer";
+      posCustPhone.value = "Guest";
+      posCustPhone.readOnly = true;
+      posAmountPaid.style.display = "none";
+      posAmountPaidLabel.style.display = "none";
+      renderPosCart();
+    };
+
+    // Customer detail inputs
+    posCustName.oninput = (e) => {
+      selectedPosCustomer.name = e.target.value;
+      if (selectedPosCustomer.id === 'guest') {
+        selectedPosCustomer.id = '';
+        selectedPosCustomer.phone = '';
+        posCustPhone.value = '';
+        posCustPhone.readOnly = false;
+        posAmountPaid.style.display = "block";
+        posAmountPaidLabel.style.display = "block";
+      }
+    };
+    posCustPhone.oninput = (e) => {
+      selectedPosCustomer.phone = e.target.value;
+    };
+
+    // Toggle main PWA layouts
+    if (tabScanner && tabPos) {
+      tabScanner.onclick = () => {
+        tabScanner.style.background = "var(--primary)";
+        tabScanner.style.color = "#121212";
+        tabPos.style.background = "transparent";
+        tabPos.style.color = "var(--text-muted)";
+        
+        posPanel.style.display = "none";
+        scannerPanel.style.display = "flex";
+        linkingPanel.style.display = "flex";
+        recentScansPanel.style.display = "flex";
+      };
+
+      tabPos.onclick = () => {
+        tabPos.style.background = "var(--primary)";
+        tabPos.style.color = "#121212";
+        tabScanner.style.background = "transparent";
+        tabScanner.style.color = "var(--text-muted)";
+        
+        posPanel.style.display = "flex";
+        scannerPanel.style.display = "none";
+        linkingPanel.style.display = "none";
+        recentScansPanel.style.display = "none";
+        
+        renderPosProducts();
+      };
+    }
+
+    // Render Sync Catalog in POS
+    function renderPosProducts() {
+      if (!posProductsList) return;
+      
+      const searchVal = posSearch.value.toLowerCase().trim();
+      const filtered = syncedProducts.filter(p => 
+        (p.name || '').toLowerCase().includes(searchVal) || 
+        (p.brand || '').toLowerCase().includes(searchVal)
+      );
+
+      if (filtered.length === 0) {
+        posProductsList.innerHTML = `<div style="text-align: center; color: var(--text-muted); font-size: 0.8rem; padding: 20px 0;">No products match your search.</div>`;
+        return;
+      }
+
+      posProductsList.innerHTML = "";
+      filtered.forEach(p => {
+        const item = document.createElement("div");
+        item.style.display = "flex";
+        item.style.alignItems = "center";
+        item.style.gap = "10px";
+        item.style.padding = "8px 12px";
+        item.style.background = "rgba(255,255,255,0.01)";
+        item.style.border = "1px solid rgba(255,255,255,0.03)";
+        item.style.borderRadius = "12px";
+        item.style.cursor = "pointer";
+        item.style.transition = "transform 0.1s";
+
+        item.onclick = () => {
+          addPosProductToCart(p);
+          item.style.transform = "scale(0.97)";
+          setTimeout(() => item.style.transform = "", 100);
+        };
+
+        const isLowStock = p.stock <= 5;
+
+        item.innerHTML = `
+          <div style="width: 36px; height: 36px; border-radius: 6px; background: rgba(255,255,255,0.04); overflow: hidden; display: flex; align-items: center; justify-content: center; flex-shrink: 0; border: 1px solid rgba(255,255,255,0.08);">
+            ${p.imageUrl ? `<img src="${p.imageUrl}" style="width: 100%; height: 100%; object-fit: cover;">` : `<span style="font-size:0.8rem;opacity:0.3;">📦</span>`}
+          </div>
+          <div style="flex: 1; min-width: 0;">
+            <div style="font-size: 0.85rem; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: var(--text-main);">${p.name}</div>
+            <div style="font-size: 0.7rem; color: var(--text-muted);">${p.brand ? p.brand : 'No Brand'} ${p.volume ? `• ${p.volume}ml` : ''}</div>
+          </div>
+          <div style="text-align: right; flex-shrink:0;">
+            <div style="font-size: 0.85rem; font-weight: bold; color: var(--primary);">PKR ${p.sellingPrice}</div>
+            <div style="font-size: 0.7rem; font-weight: 600; color: ${isLowStock ? 'var(--danger)' : 'var(--success)'};">${p.stock} units</div>
+          </div>
+        `;
+
+        posProductsList.appendChild(item);
+      });
+    }
+
+    posSearch.oninput = renderPosProducts;
+
+    // Cart Management
+    function addPosProductToCart(product) {
+      if (product.stock <= 0) {
+        alert("⚠️ Out of Stock!");
+        return;
+      }
+      
+      const existing = posCart.find(item => item.id === product.id);
+      if (existing) {
+        if (existing.quantity >= product.stock) {
+          alert("⚠️ Insufficient Stock!");
+          return;
+        }
+        existing.quantity += 1;
+      } else {
+        posCart.push({ ...product, quantity: 1 });
+      }
+      
+      playBeepSound();
+      renderPosCart();
+    }
+
+    function updatePosCartQty(productId, delta) {
+      const existing = posCart.find(item => item.id === productId);
+      if (!existing) return;
+      
+      const newQty = existing.quantity + delta;
+      if (newQty <= 0) {
+        posCart = posCart.filter(item => item.id !== productId);
+      } else {
+        if (newQty > existing.stock) {
+          alert("⚠️ Insufficient Stock!");
+          return;
+        }
+        existing.quantity = newQty;
+      }
+      
+      renderPosCart();
+    }
+
+    function renderPosCart() {
+      if (posCart.length === 0) {
+        posCartList.innerHTML = `<div style="text-align: center; color: var(--text-muted); font-size: 0.8rem; padding: 20px 0;" id="posEmptyCartMsg">Cart is empty. Tap products above to add!</div>`;
+        posCartCount.innerText = "Items: 0";
+        posTotalText.innerText = "PKR 0";
+        return;
+      }
+
+      const msg = document.getElementById("posEmptyCartMsg");
+      if (msg) msg.style.display = 'none';
+      posCartList.innerHTML = "";
+
+      let subtotal = 0;
+      let totalQty = 0;
+
+      posCart.forEach(item => {
+        const itemCost = item.sellingPrice * item.quantity;
+        subtotal += itemCost;
+        totalQty += item.quantity;
+
+        const row = document.createElement("div");
+        row.style.display = "flex";
+        row.style.justifyContent = "space-between";
+        row.style.alignItems = "center";
+        row.style.padding = "8px 12px";
+        row.style.background = "rgba(255,255,255,0.02)";
+        row.style.borderRadius = "10px";
+        row.style.gap = "10px";
+
+        row.innerHTML = `
+          <div style="flex: 1; min-width: 0;">
+            <div style="font-size: 0.85rem; font-weight: bold; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${item.name}</div>
+            <div style="font-size: 0.75rem; color: var(--primary);">PKR ${item.sellingPrice} x ${item.quantity}</div>
+          </div>
+          <div style="display: flex; align-items: center; gap: 8px; flex-shrink: 0;">
+            <div style="display: flex; align-items: center; gap: 6px; background: rgba(255,255,255,0.05); padding: 3px 8px; border-radius: 6px;">
+              <span style="font-size: 1.1rem; font-weight:bold; cursor: pointer; padding: 0 4px;" onclick="updatePosCartQty('${item.id}', -1)">-</span>
+              <span style="font-size: 0.85rem; font-weight:bold;">${item.quantity}</span>
+              <span style="font-size: 1.1rem; font-weight:bold; cursor: pointer; padding: 0 4px;" onclick="updatePosCartQty('${item.id}', 1)">+</span>
+            </div>
+          </div>
+        `;
+        posCartList.appendChild(row);
+      });
+
+      posCartCount.innerText = `Items: ${totalQty}`;
+      
+      const disc = parseFloat(posDiscount.value) || 0;
+      const finalTotal = Math.max(0, subtotal - disc);
+      posTotalText.innerText = `PKR ${finalTotal.toLocaleString()}`;
+    }
+
+    posDiscount.oninput = renderPosCart;
+
+    // Checkout Button Loader State
+    function updatePosCheckoutButtonState(loading) {
+      isPosCheckoutLoading = loading;
+      if (loading) {
+        btnPosCheckout.disabled = true;
+        btnPosCheckout.style.opacity = "0.7";
+        btnPosCheckout.innerText = "Processing checkout on Laptop...";
+      } else {
+        btnPosCheckout.disabled = false;
+        btnPosCheckout.style.opacity = "1";
+        btnPosCheckout.innerText = "Complete POS Sale";
+      }
+    }
+
+    // Remote Checkout Execution
+    btnPosCheckout.onclick = () => {
+      if (posCart.length === 0) {
+        alert("⚠️ Please add products to cart first!");
+        return;
+      }
+      
+      if (!selectedPosCustomer.name) {
+        alert("⚠️ Please enter Customer Details or tap 'Walk-in'!");
+        return;
+      }
+
+      if (!isLinked || !currentSessionId || !firebaseDb) {
+        alert("⚠️ POS is not linked to Laptop! Setup connection first.");
+        return;
+      }
+
+      updatePosCheckoutButtonState(true);
+
+      const disc = parseFloat(posDiscount.value) || 0;
+      const amtPaid = parseFloat(posAmountPaid.value) || 0;
+
+      const checkoutPayload = {
+        cart: posCart.map(item => ({
+          id: item.id,
+          name: item.name,
+          quantity: item.quantity,
+          sellingPrice: item.sellingPrice,
+          costPrice: item.costPrice
+        })),
+        selectedCustomer: selectedPosCustomer,
+        discount: disc,
+        amountPaid: amtPaid,
+        paymentMethod: posPaymentMethod,
+        saleType: posSaleType,
+        timestamp: Date.now()
+      };
+
+      // Push checkout request to Firebase Realtime Database
+      firebaseDb.ref(`sessions/${currentSessionId}/mobile_sale_request`).set(checkoutPayload)
+        .catch(err => {
+          console.error("Checkout push error:", err);
+          alert("Error linking checkout to database!");
+          updatePosCheckoutButtonState(false);
+        });
+    };
+
+    // Populate digital receipt
+    function showMobileInvoice(result) {
+      invCustName.innerText = result.customerName;
+      invDate.innerText = new Date(result.timestamp).toLocaleDateString('en-PK', { dateStyle: 'medium' });
+      invId.innerText = "#" + result.saleId;
+      
+      invItemsBody.innerHTML = "";
+      result.items.forEach(item => {
+        const row = document.createElement("tr");
+        row.style.borderBottom = "1px dashed #eee";
+        row.innerHTML = `
+          <td style="padding: 4px 0; font-weight: 500;">${item.name}</td>
+          <td style="padding: 4px 0; text-align: center;">${item.quantity}</td>
+          <td style="padding: 4px 0; text-align: right; font-weight: 700;">${((item.sellingPrice || item.price) * item.quantity).toLocaleString()}</td>
+        `;
+        invItemsBody.appendChild(row);
+      });
+
+      invSubtotal.innerText = `PKR ${result.subtotal.toLocaleString()}`;
+      if (result.discount > 0) {
+        invDiscountRow.style.display = "flex";
+        invDiscount.innerText = `-PKR ${result.discount.toLocaleString()}`;
+      } else {
+        invDiscountRow.style.display = "none";
+      }
+
+      invTotal.innerText = `PKR ${result.total.toLocaleString()}`;
+      invReceived.innerText = `PKR ${result.amountPaid.toLocaleString()}`;
+      
+      if (result.balanceDue >= 0) {
+        invBalanceLabel.innerText = "Baqaya (Change):";
+        invBalance.innerText = `PKR ${result.balanceDue.toLocaleString()}`;
+        invBalance.style.color = "#166534";
+      } else {
+        invBalanceLabel.innerText = "Outstanding Dues:";
+        invBalance.innerText = `PKR ${Math.abs(result.balanceDue).toLocaleString()}`;
+        invBalance.style.color = "#b45309";
+      }
+
+      // WhatsApp Formatting & Sharing logic
+      btnPosWhatsApp.onclick = () => {
+        const text = 
+          `*ABU ASIM PERFUMERY RECEIPT*\n` +
+          `=========================\n` +
+          `*Invoice #:* ${result.saleId}\n` +
+          `*Date:* ${new Date(result.timestamp).toLocaleDateString()}\n` +
+          `*Customer:* ${result.customerName}\n` +
+          `-------------------------\n` +
+          `*Items:*\n` +
+          result.items.map(item => `• ${item.name} x${item.quantity} - PKR ${((item.sellingPrice || item.price) * item.quantity).toLocaleString()}`).join('\n') + `\n` +
+          `-------------------------\n` +
+          `*Subtotal:* PKR ${result.subtotal.toLocaleString()}\n` +
+          (result.discount > 0 ? `*Discount:* -PKR ${result.discount.toLocaleString()}\n` : '') +
+          `*Grand Total:* PKR ${result.total.toLocaleString()}\n` +
+          `*Received:* PKR ${result.amountPaid.toLocaleString()}\n` +
+          `*${result.balanceDue >= 0 ? 'Baqaya' : 'Outstanding'}:* PKR ${Math.abs(result.balanceDue).toLocaleString()}\n` +
+          `=========================\n` +
+          `Thank you for shopping with us!\n` +
+          `_Powered by Abu Asim Digital Bills_`;
+          
+        const cleanPhone = result.customerPhone && result.customerPhone !== 'Guest' ? result.customerPhone.replace(/[^0-9]/g, '') : '';
+        const formattedPhone = cleanPhone.startsWith('0') ? '92' + cleanPhone.substring(1) : cleanPhone;
+        
+        const whatsappUrl = `https://wa.me/${formattedPhone}?text=${encodeURIComponent(text)}`;
+        window.open(whatsappUrl, '_blank');
+      };
+
+      invoiceModal.classList.add("active");
+    }
+
+    // New Sale (Reset Cart)
+    btnPosCloseInvoice.onclick = () => {
+      invoiceModal.classList.remove("active");
+      posCart = [];
+      posDiscount.value = "0";
+      posAmountPaid.value = "";
+      posCustName.value = "";
+      posCustPhone.value = "";
+      posCustPhone.readOnly = false;
+      posAmountPaid.style.display = "block";
+      posAmountPaidLabel.style.display = "block";
+      selectedPosCustomer = { name: "", phone: "", id: "" };
+      posPaymentMethod = "Cash";
+      posSaleType = "Physical";
+      
+      btnPosPayCash.click();
+      btnPosTypePhysical.click();
+      
+      renderPosCart();
+    };
+
+    // --- Custom Firebase Configuration Modal Logic ---
+    const configModal = document.getElementById("configModal");
+    const btnOpenConfig = document.getElementById("btnOpenConfig");
+    const btnSaveConfig = document.getElementById("btnSaveConfig");
+    const btnCancelConfig = document.getElementById("btnCancelConfig");
+    const fbDbUrl = document.getElementById("fbDbUrl");
+    const fbApiKey = document.getElementById("fbApiKey");
+    const fbProjId = document.getElementById("fbProjId");
+
+    if (btnOpenConfig) {
+      btnOpenConfig.addEventListener("click", () => {
+        // Pre-populate input values from current database or settings
+        const savedConfig = localStorage.getItem("fb_config");
+        if (savedConfig) {
+          try {
+            const config = JSON.parse(savedConfig);
+            fbDbUrl.value = config.databaseURL || "";
+            fbApiKey.value = config.apiKey || "";
+            fbProjId.value = config.projectId || "";
+          } catch(e){}
+        } else {
+          // Defaults if no config is set
+          fbDbUrl.value = "";
+          fbApiKey.value = "";
+          fbProjId.value = "";
+        }
+        configModal.classList.add("active");
+      });
+    }
+
+    if (btnCancelConfig) {
+      btnCancelConfig.addEventListener("click", () => {
+        // Cancel custom configuration - clear settings and reload to go back to Default Demo Server
+        const confirmDemo = confirm("Use default public demo database server?");
+        if (confirmDemo) {
+          localStorage.removeItem("fb_config");
+          configModal.classList.remove("active");
+          alert("Resetting database to Demo. The app will now reload.");
+          window.location.reload();
+        } else {
+          configModal.classList.remove("active");
+        }
+      });
+    }
+
+    if (btnSaveConfig) {
+      btnSaveConfig.addEventListener("click", () => {
+        const dbUrl = fbDbUrl.value.trim();
+        const apiKey = fbApiKey.value.trim();
+        const projId = fbProjId.value.trim();
+
+        if (!dbUrl || !apiKey || !projId) {
+          alert("All fields are required to setup private Firebase!");
+          return;
+        }
+
+        // Build a complete Firebase project configuration object
+        const customConfig = {
+          apiKey: apiKey,
+          authDomain: `${projId}.firebaseapp.com`,
+          databaseURL: dbUrl,
+          projectId: projId,
+          storageBucket: `${projId}.firebasestorage.app`,
+          messagingSenderId: "1234567890", // placeholder
+          appId: "1:1234567890:web:abcdef123456" // placeholder
+        };
+
+        localStorage.setItem("fb_config", JSON.stringify(customConfig));
+        configModal.classList.remove("active");
+        alert("Custom Firebase configuration saved! Reloading to link new database.");
+        window.location.reload();
+      });
+    }
 
     // --- Onload Init ---
     window.addEventListener('load', () => {
