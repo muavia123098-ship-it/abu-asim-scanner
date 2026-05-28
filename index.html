@@ -1,2054 +1,351 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>Abu Asim Wireless Scanner</title>
-  
-  <!-- Google Fonts -->
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;800&display=swap" rel="stylesheet">
-  
-  <!-- CDNs for Firebase Compat (Robust for static HTML) -->
-  <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-database-compat.js"></script>
-  
-  <!-- CDN for HTML5 Barcode/QR Scanner -->
-  <script src="https://unpkg.com/html5-qrcode"></script>
-
-  <!-- PWA Manifest -->
-  <link rel="manifest" href="./manifest.json">
-
-  <style>
-    :root {
-      --bg-dark: #09090b;
-      --bg-surface: rgba(18, 18, 22, 0.75);
-      --primary: #d4af37; /* Gold accent */
-      --primary-glow: rgba(212, 175, 55, 0.4);
-      --success: #22c55e;
-      --danger: #ef4444;
-      --warning: #f59e0b;
-      --text-main: #f4f4f5;
-      --text-muted: #a1a1aa;
-      --border-glass: rgba(212, 175, 55, 0.15);
-    }
-
-    * {
-      box-sizing: border-box;
-      margin: 0;
-      padding: 0;
-      font-family: 'Outfit', sans-serif;
-      -webkit-tap-highlight-color: transparent;
-    }
-
-    html {
-      background-color: #000; /* Dark background for desktop */
-    }
-
-    body {
-      background-color: var(--bg-dark);
-      color: var(--text-main);
-      min-height: 100vh;
-      width: 100%;
-      max-width: 430px; /* Mobile width */
-      margin: 0 auto; /* Center on large screens */
-      position: relative;
-      overflow-x: hidden;
-      display: flex;
-      flex-direction: column;
-      padding: 16px;
-      /* Crucial: Makes all 'position: fixed' children relative to this body container instead of the whole desktop screen */
-      transform: translateZ(0); 
-    }
-
-    /* Desktop Mobile Simulator Frame */
-    @media (min-width: 480px) {
-      body {
-        height: 92vh;
-        min-height: 600px;
-        margin-top: 4vh;
-        margin-bottom: 4vh;
-        border-radius: 40px;
-        border: 10px solid #1a1a1f;
-        box-shadow: 0 30px 60px rgba(0,0,0,0.8), 0 0 0 2px #000;
-        overflow-y: auto;
-      }
-      /* Fake iPhone-like Notch */
-      body::after {
-        content: '';
-        position: fixed;
-        top: 0; 
-        left: 50%;
-        transform: translateX(-50%);
-        width: 140px;
-        height: 24px;
-        background: #1a1a1f;
-        border-bottom-left-radius: 16px;
-        border-bottom-right-radius: 16px;
-        z-index: 9999999;
-      }
-    }
-
-    /* Background decorative ambient lights */
-    .ambient-glow {
-      position: fixed;
-      width: 250px;
-      height: 250px;
-      background: radial-gradient(circle, var(--primary-glow) 0%, rgba(0,0,0,0) 70%);
-      top: -50px;
-      right: -50px;
-      z-index: -1;
-      opacity: 0.6;
-    }
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>VoiceCalc - Hands-Free Voice Calculator</title>
     
-    .ambient-glow-bottom {
-      position: fixed;
-      width: 300px;
-      height: 300px;
-      background: radial-gradient(circle, rgba(212,175,55,0.05) 0%, rgba(0,0,0,0) 70%);
-      bottom: -100px;
-      left: -100px;
-      z-index: -1;
-      opacity: 0.6;
-    }
+    <!-- PWA & Mobile Web App Meta Tags -->
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="theme-color" content="#0a0b10">
+    <link rel="manifest" href="manifest.json">
+    <link rel="apple-touch-icon" href="icon-192.png">
 
-    header {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      margin-bottom: 20px;
-      z-index: 10;
-    }
-
-    .brand {
-      display: flex;
-      flex-direction: column;
-    }
-
-    .brand h1 {
-      font-size: 1.3rem;
-      font-weight: 800;
-      letter-spacing: 1px;
-      color: var(--primary);
-      text-shadow: 0 0 10px rgba(212, 175, 55, 0.2);
-    }
-
-    .brand p {
-      font-size: 0.7rem;
-      color: var(--text-muted);
-      letter-spacing: 0.5px;
-      text-transform: uppercase;
-      margin-top: 1px;
-    }
-
-    /* Live Sync Indicator */
-    .status-badge {
-      display: flex;
-      align-items: center;
-      gap: 6px;
-      background: rgba(255, 255, 255, 0.03);
-      border: 1px solid rgba(255, 255, 255, 0.08);
-      padding: 6px 12px;
-      border-radius: 20px;
-      font-size: 0.75rem;
-      font-weight: 600;
-      transition: all 0.3s ease;
-    }
-
-    .status-dot {
-      width: 8px;
-      height: 8px;
-      border-radius: 50%;
-      background-color: var(--danger);
-      box-shadow: 0 0 8px var(--danger);
-    }
-
-    /* Status States */
-    .status-badge.offline .status-dot {
-      background-color: var(--danger);
-      box-shadow: 0 0 8px var(--danger);
-      animation: pulse-danger 1.5s infinite;
-    }
-
-    .status-badge.connecting .status-dot {
-      background-color: var(--warning);
-      box-shadow: 0 0 8px var(--warning);
-      animation: pulse-warning 1s infinite;
-    }
-
-    .status-badge.ready .status-dot {
-      background-color: var(--success);
-      box-shadow: 0 0 8px var(--success);
-      animation: pulse-success 2s infinite;
-    }
-
-    .status-badge.linked .status-dot {
-      background-color: #00bcd4;
-      box-shadow: 0 0 10px #00bcd4;
-      animation: pulse-linked 1s infinite;
-    }
-
-    @keyframes pulse-danger { 0%, 100% { opacity: 0.4; } 50% { opacity: 1; } }
-    @keyframes pulse-warning { 0%, 100% { opacity: 0.4; } 50% { opacity: 1; } }
-    @keyframes pulse-success { 0%, 100% { opacity: 0.5; } 50% { opacity: 1; } }
-    @keyframes pulse-linked { 0%, 100% { transform: scale(1); filter: brightness(1); } 50% { transform: scale(1.2); filter: brightness(1.3); } }
-
-    /* Glassmorphism Panel wrapper */
-    .panel {
-      background: var(--bg-surface);
-      backdrop-filter: blur(16px);
-      -webkit-backdrop-filter: blur(16px);
-      border: 1px solid var(--border-glass);
-      border-radius: 24px;
-      padding: 16px;
-      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
-      margin-bottom: 16px;
-      display: flex;
-      flex-direction: column;
-      gap: 16px;
-      z-index: 5;
-    }
-
-    /* Viewfinder Styling */
-    .scanner-container {
-      position: relative;
-      width: 100%;
-      aspect-ratio: 1 / 1;
-      background: #000;
-      border-radius: 20px;
-      overflow: hidden;
-      border: 1.5px solid var(--border-glass);
-      box-shadow: inset 0 0 20px rgba(0,0,0,0.8);
-    }
-
-    #reader {
-      width: 100% !important;
-      height: 100% !important;
-      border: none !important;
-    }
-
-    #reader video {
-      width: 100% !important;
-      height: 100% !important;
-      object-fit: cover !important;
-    }
-
-    /* Floating Viewfinder Frame overlays */
-    .scanner-overlay {
-      position: absolute;
-      top: 0;
-      left: 0;
-      right: 0;
-      bottom: 0;
-      pointer-events: none;
-      display: flex;
-      flex-direction: column;
-      justify-content: center;
-      align-items: center;
-      z-index: 2;
-    }
-
-    .focus-box {
-      width: 70%;
-      height: 70%;
-      border: 2px dashed rgba(212, 175, 55, 0.4);
-      border-radius: 12px;
-      position: relative;
-      box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.45);
-      transition: all 0.3s ease;
-    }
-
-    .focus-box.scanning {
-      border-color: var(--primary);
-      box-shadow: 0 0 15px var(--primary-glow), 0 0 0 9999px rgba(0, 0, 0, 0.5);
-    }
-
-    /* Neon Laser Line animation */
-    .laser-line {
-      position: absolute;
-      left: 2%;
-      right: 2%;
-      height: 3px;
-      background: linear-gradient(90deg, rgba(212,175,55,0) 0%, var(--primary) 50%, rgba(212,175,55,0) 100%);
-      box-shadow: 0 0 12px var(--primary), 0 0 20px var(--primary);
-      animation: scan-anim 2.5s infinite ease-in-out;
-      opacity: 0;
-    }
-
-    .focus-box.scanning .laser-line {
-      opacity: 1;
-    }
-
-    @keyframes scan-anim {
-      0% { top: 5%; }
-      50% { top: 95%; }
-      100% { top: 5%; }
-    }
-
-    /* Corner brackets for viewfinder */
-    .corner {
-      position: absolute;
-      width: 20px;
-      height: 20px;
-      border-color: var(--primary);
-      border-style: solid;
-      border-width: 0;
-    }
-    .corner-tl { top: -2px; left: -2px; border-top-width: 4px; border-left-width: 4px; border-top-left-radius: 8px; }
-    .corner-tr { top: -2px; right: -2px; border-top-width: 4px; border-right-width: 4px; border-top-right-radius: 8px; }
-    .corner-bl { bottom: -2px; left: -2px; border-bottom-width: 4px; border-left-width: 4px; border-bottom-left-radius: 8px; }
-    .corner-br { bottom: -2px; right: -2px; border-bottom-width: 4px; border-right-width: 4px; border-bottom-right-radius: 8px; }
-
-    /* Configuration Panel (Session Linking) */
-    .config-grid {
-      display: grid;
-      grid-template-columns: 1fr;
-      gap: 12px;
-    }
-
-    .form-group {
-      display: flex;
-      flex-direction: column;
-      gap: 6px;
-    }
-
-    label {
-      font-size: 0.75rem;
-      color: var(--text-muted);
-      font-weight: 600;
-      text-transform: uppercase;
-      letter-spacing: 0.5px;
-    }
-
-    input, select {
-      background: rgba(255, 255, 255, 0.04);
-      border: 1px solid rgba(255, 255, 255, 0.1);
-      border-radius: 12px;
-      padding: 12px;
-      font-size: 0.9rem;
-      color: var(--text-main);
-      outline: none;
-      transition: all 0.3s ease;
-      width: 100%;
-    }
-
-    input:focus, select:focus {
-      border-color: var(--primary);
-      box-shadow: 0 0 10px var(--primary-glow);
-      background: rgba(255, 255, 255, 0.07);
-    }
-
-    .btn {
-      background: linear-gradient(135deg, var(--primary) 0%, #b8972f 100%);
-      color: #121212;
-      border: none;
-      border-radius: 12px;
-      padding: 14px;
-      font-weight: 700;
-      font-size: 0.95rem;
-      cursor: pointer;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      gap: 8px;
-      box-shadow: 0 4px 15px rgba(212, 175, 55, 0.25);
-      transition: all 0.2s ease;
-      text-shadow: 0 0 1px rgba(255,255,255,0.4);
-    }
-
-    .btn:active {
-      transform: scale(0.97);
-      box-shadow: 0 2px 5px rgba(212, 175, 55, 0.15);
-    }
-
-    .btn-secondary {
-      background: rgba(255, 255, 255, 0.05);
-      border: 1px solid rgba(255, 255, 255, 0.1);
-      color: var(--text-main);
-      box-shadow: none;
-    }
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&family=Space+Grotesk:wght@400;500;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
     
-    .btn-secondary:active {
-      background: rgba(255, 255, 255, 0.08);
-    }
-
-    /* Recent Scans list */
-    .scans-title {
-      font-size: 0.8rem;
-      font-weight: 700;
-      color: var(--primary);
-      text-transform: uppercase;
-      letter-spacing: 1px;
-      margin-bottom: 8px;
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-    }
-
-    .scans-list {
-      display: flex;
-      flex-direction: column;
-      gap: 8px;
-      max-height: 160px;
-      overflow-y: auto;
-    }
-
-    .scan-item {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      padding: 10px 14px;
-      background: rgba(255,255,255,0.02);
-      border: 1px solid rgba(255,255,255,0.04);
-      border-radius: 12px;
-      font-size: 0.85rem;
-      animation: item-slide 0.3s ease-out;
-    }
-
-    @keyframes item-slide {
-      from { opacity: 0; transform: translateY(-5px); }
-      to { opacity: 1; transform: translateY(0); }
-    }
-
-    .scan-barcode {
-      font-family: monospace;
-      font-weight: 600;
-      color: var(--text-main);
-    }
-
-    .scan-time {
-      font-size: 0.7rem;
-      color: var(--text-muted);
-    }
-
-    .scan-status {
-      font-size: 0.75rem;
-      font-weight: bold;
-      color: var(--success);
-    }
-
-    /* Modal dialog */
-    .modal {
-      position: fixed;
-      top: 0; left: 0; right: 0; bottom: 0;
-      background: rgba(0,0,0,0.85);
-      backdrop-filter: blur(12px);
-      -webkit-backdrop-filter: blur(12px);
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      padding: 20px;
-      z-index: 1000;
-      opacity: 0;
-      pointer-events: none;
-      transition: all 0.3s ease;
-    }
-
-    .modal.active {
-      opacity: 1;
-      pointer-events: all;
-    }
-
-    .modal-content {
-      background: #121214;
-      border: 1.5px solid var(--primary);
-      border-radius: 24px;
-      padding: 24px;
-      width: 100%;
-      max-width: 360px;
-      text-align: center;
-      box-shadow: 0 15px 40px rgba(0,0,0,0.6);
-      transform: scale(0.9);
-      transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
-    }
-
-    .modal.active .modal-content {
-      transform: scale(1);
-    }
-
-    .modal h3 {
-      color: var(--primary);
-      margin-bottom: 12px;
-      font-size: 1.2rem;
-      font-weight: 800;
-    }
-
-    .modal p {
-      font-size: 0.85rem;
-      color: var(--text-muted);
-      line-height: 1.5;
-      margin-bottom: 20px;
-    }
-
-    /* Pulse active animation for scan notification */
-    .scan-toast {
-      position: fixed;
-      bottom: 30px;
-      left: 50%;
-      transform: translateX(-50%) translateY(100px);
-      background: var(--success);
-      color: #000;
-      padding: 10px 20px;
-      border-radius: 30px;
-      font-weight: 700;
-      font-size: 0.85rem;
-      box-shadow: 0 10px 20px rgba(34, 197, 94, 0.3);
-      transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
-      z-index: 100;
-      opacity: 0;
-      visibility: hidden;
-    }
-    
-    .scan-toast.active {
-      transform: translateX(-50%) translateY(0);
-      opacity: 1;
-      visibility: visible;
-    }
-
-    /* ─────────────── SPLASH SCREEN ─────────────── */
-    #splashScreen {
-      position: fixed;
-      top: 0; left: 0; right: 0; bottom: 0;
-      background: radial-gradient(ellipse at 30% 20%, rgba(212,175,55,0.08) 0%, transparent 60%),
-                  radial-gradient(ellipse at 80% 80%, rgba(212,175,55,0.05) 0%, transparent 50%),
-                  #09090b;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      z-index: 99999;
-      transition: opacity 0.7s ease, visibility 0.7s ease;
-    }
-
-    #splashScreen.hidden {
-      opacity: 0;
-      visibility: hidden;
-      pointer-events: none;
-    }
-
-    /* Floating particles */
-    .splash-particle {
-      position: absolute;
-      width: 3px;
-      height: 3px;
-      background: var(--primary);
-      border-radius: 50%;
-      opacity: 0;
-      animation: float-up var(--dur, 4s) var(--delay, 0s) infinite ease-in;
-    }
-
-    @keyframes float-up {
-      0%   { opacity: 0; transform: translateY(0) scale(0.5); }
-      20%  { opacity: 0.6; }
-      80%  { opacity: 0.3; }
-      100% { opacity: 0; transform: translateY(-200px) scale(1.2); }
-    }
-
-    /* Outer rotating ring */
-    .splash-ring {
-      width: 130px;
-      height: 130px;
-      border-radius: 50%;
-      border: 2px solid transparent;
-      border-top-color: var(--primary);
-      border-right-color: rgba(212,175,55,0.3);
-      animation: ring-spin 1.8s linear infinite;
-      position: absolute;
-    }
-
-    @keyframes ring-spin {
-      0%   { transform: rotate(0deg); }
-      100% { transform: rotate(360deg); }
-    }
-
-    /* Inner counter-rotating ring */
-    .splash-ring-inner {
-      width: 105px;
-      height: 105px;
-      border-radius: 50%;
-      border: 1.5px solid transparent;
-      border-bottom-color: rgba(212,175,55,0.5);
-      border-left-color: transparent;
-      animation: ring-spin-rev 2.4s linear infinite;
-      position: absolute;
-    }
-
-    @keyframes ring-spin-rev {
-      0%   { transform: rotate(0deg); }
-      100% { transform: rotate(-360deg); }
-    }
-
-    /* Logo circle */
-    .splash-logo-wrap {
-      position: relative;
-      width: 130px;
-      height: 130px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      margin-bottom: 36px;
-    }
-
-    .splash-logo-circle {
-      width: 88px;
-      height: 88px;
-      border-radius: 50%;
-      background: linear-gradient(135deg, #1a1a1a 0%, #242424 100%);
-      border: 1.5px solid rgba(212,175,55,0.35);
-      box-shadow: 0 0 25px rgba(212,175,55,0.2), inset 0 0 20px rgba(0,0,0,0.5);
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      animation: logo-pulse 2s ease-in-out infinite;
-    }
-
-    @keyframes logo-pulse {
-      0%, 100% { box-shadow: 0 0 25px rgba(212,175,55,0.2), inset 0 0 20px rgba(0,0,0,0.5); }
-      50%       { box-shadow: 0 0 45px rgba(212,175,55,0.45), inset 0 0 20px rgba(0,0,0,0.5); }
-    }
-
-    /* AA Monogram text logo inside circle */
-    .splash-monogram {
-      font-size: 2rem;
-      font-weight: 800;
-      color: var(--primary);
-      letter-spacing: -2px;
-      text-shadow: 0 0 20px rgba(212,175,55,0.5);
-      animation: monogram-glow 2s ease-in-out infinite;
-      line-height: 1;
-    }
-
-    @keyframes monogram-glow {
-      0%, 100% { text-shadow: 0 0 15px rgba(212,175,55,0.4); }
-      50%       { text-shadow: 0 0 30px rgba(212,175,55,0.9); }
-    }
-
-    /* Title text */
-    .splash-title {
-      font-size: 1.7rem;
-      font-weight: 800;
-      letter-spacing: 3px;
-      text-transform: uppercase;
-      color: var(--primary);
-      text-shadow: 0 0 20px rgba(212,175,55,0.3);
-      animation: title-in 0.9s cubic-bezier(0.34,1.56,0.64,1) 0.3s both;
-    }
-
-    .splash-subtitle {
-      font-size: 0.7rem;
-      letter-spacing: 5px;
-      text-transform: uppercase;
-      color: var(--text-muted);
-      margin-top: 6px;
-      animation: title-in 0.9s cubic-bezier(0.34,1.56,0.64,1) 0.5s both;
-    }
-
-    @keyframes title-in {
-      from { opacity: 0; transform: translateY(12px); }
-      to   { opacity: 1; transform: translateY(0); }
-    }
-
-    /* Progress bar */
-    .splash-progress-wrap {
-      width: 180px;
-      height: 3px;
-      background: rgba(255,255,255,0.06);
-      border-radius: 10px;
-      margin-top: 44px;
-      overflow: hidden;
-      animation: title-in 0.6s ease 0.6s both;
-    }
-
-    .splash-progress-bar {
-      height: 100%;
-      width: 0%;
-      background: linear-gradient(90deg, rgba(212,175,55,0.4) 0%, var(--primary) 100%);
-      border-radius: 10px;
-      box-shadow: 0 0 8px rgba(212,175,55,0.5);
-      animation: progress-fill 2.6s ease-out 0.4s forwards;
-    }
-
-    @keyframes progress-fill {
-      0%   { width: 0%; }
-      100% { width: 100%; }
-    }
-
-    .splash-tagline {
-      font-size: 0.65rem;
-      color: rgba(161,161,170,0.5);
-      letter-spacing: 2px;
-      text-transform: uppercase;
-      margin-top: 14px;
-      animation: title-in 0.6s ease 0.8s both;
-    }
-
-    /* ─────────────── LOCK SCREEN ─────────────── */
-    #passkeyScreen {
-      position: fixed;
-      top: 0; left: 0; right: 0; bottom: 0;
-      background: var(--bg-dark);
-      z-index: 99990;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      transition: opacity 0.4s ease, visibility 0.4s ease;
-      padding: 20px;
-    }
-    #passkeyScreen.hidden {
-      opacity: 0;
-      visibility: hidden;
-      pointer-events: none;
-    }
-    .passkey-title {
-      color: var(--primary);
-      font-size: 1.5rem;
-      font-weight: 800;
-      margin-bottom: 30px;
-      text-shadow: 0 0 10px rgba(212,175,55,0.3);
-    }
-    .dots-container {
-      display: flex;
-      gap: 15px;
-      margin-bottom: 40px;
-    }
-    .passkey-dot {
-      width: 15px;
-      height: 15px;
-      border-radius: 50%;
-      border: 2px solid var(--primary);
-      transition: background 0.2s, box-shadow 0.2s;
-    }
-    .passkey-dot.filled {
-      background: var(--primary);
-      box-shadow: 0 0 10px var(--primary-glow);
-    }
-    .keypad {
-      display: grid;
-      grid-template-columns: repeat(3, 1fr);
-      gap: 20px;
-    }
-    .keypad button {
-      width: 70px;
-      height: 70px;
-      border-radius: 50%;
-      border: 1px solid rgba(212,175,55,0.3);
-      background: rgba(255,255,255,0.05);
-      color: white;
-      font-size: 1.5rem;
-      font-weight: 600;
-      cursor: pointer;
-      transition: all 0.2s;
-      outline: none;
-    }
-    .keypad button:active {
-      background: var(--primary);
-      color: black;
-      transform: scale(0.95);
-    }
-    .keypad button.empty {
-      visibility: hidden;
-    }
-    .error-shake {
-      animation: shake 0.4s ease-in-out;
-    }
-    @keyframes shake {
-      0%, 100% { transform: translateX(0); }
-      20%, 60% { transform: translateX(-10px); }
-      40%, 80% { transform: translateX(10px); }
-    }
-  </style>
+    <!-- Custom Style Sheet -->
+    <link rel="stylesheet" href="style.css">
 </head>
 <body>
-
-  <!-- ═══════ PREMIUM SPLASH SCREEN ═══════ -->
-  <div id="splashScreen">
-
-    <!-- Floating Gold Particles -->
-    <div class="splash-particle" style="left:15%; bottom:20%; --dur:3.5s; --delay:0s;"></div>
-    <div class="splash-particle" style="left:30%; bottom:10%; --dur:4.2s; --delay:0.5s;"></div>
-    <div class="splash-particle" style="left:55%; bottom:15%; --dur:3.8s; --delay:1s;"></div>
-    <div class="splash-particle" style="left:70%; bottom:25%; --dur:4.5s; --delay:0.3s;"></div>
-    <div class="splash-particle" style="left:85%; bottom:12%; --dur:3.2s; --delay:0.8s;"></div>
-    <div class="splash-particle" style="left:45%; bottom:5%;  --dur:4.8s; --delay:1.5s;"></div>
-
-    <!-- Animated Logo -->
-    <div class="splash-logo-wrap">
-      <div class="splash-ring"></div>
-      <div class="splash-ring-inner"></div>
-      <div class="splash-logo-circle">
-        <img src="./assets/logo.png" alt="Abu Asim Logo" style="width:65px; height:65px; object-fit:contain; border-radius:50%;">
-      </div>
-    </div>
-
-    <!-- Branding Text -->
-    <div class="splash-title">Abu Asim</div>
-    <div class="splash-subtitle">Management System</div>
-
-    <!-- Progress Bar -->
-    <div class="splash-progress-wrap">
-      <div class="splash-progress-bar"></div>
-    </div>
-
-    <div class="splash-tagline">Wireless Scanner v1.0</div>
-  </div>
-
-  <!-- ═══════ PASSKEY SCREEN ═══════ -->
-  <div id="passkeyScreen">
-    <div class="passkey-title">Enter Passkey</div>
-    <div class="form-group" style="width: 100%; max-width: 300px; margin-bottom: 20px;">
-      <input type="password" id="passkeyInput" placeholder="••••••••••" style="text-align: center; font-size: 1.2rem; padding: 15px; letter-spacing: 2px;">
-    </div>
-    <button class="btn" id="btnUnlock" style="width: 100%; max-width: 300px;">Unlock App</button>
-  </div>
-
-  <div class="ambient-glow"></div>
-  <div class="ambient-glow-bottom"></div>
-
-  <!-- Header -->
-  <header>
-    <div class="brand">
-      <h1>Abu Asim</h1>
-      <p>Wireless Mobile Scanner</p>
-    </div>
-    <div style="display: flex; align-items: center; gap: 10px;">
-      <div class="status-badge offline" id="connectionBadge">
-        <div class="status-dot"></div>
-        <span id="connectionText">Offline</span>
-      </div>
-      <!-- Settings Button -->
-      <button id="btnOpenConfig" title="Database Config" style="background: rgba(255,255,255,0.05); border: 1px solid rgba(212,175,55,0.3); color: var(--primary); width: 36px; height: 36px; border-radius: 50%; cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 1rem; transition: all 0.2s;">⚙️</button>
-      <!-- Lock Button -->
-      <button id="btnLock" title="Lock App" style="background: rgba(255,255,255,0.05); border: 1px solid rgba(212,175,55,0.3); color: var(--primary); width: 36px; height: 36px; border-radius: 50%; cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 1rem; transition: all 0.2s;">🔒</button>
-    </div>
-  </header>
-
-  <!-- Tab Mode Selector -->
-  <div style="display: flex; gap: 6px; background: rgba(255,255,255,0.02); border: 1px solid var(--border-glass); border-radius: 14px; padding: 3px; margin-bottom: 16px; z-index: 10;">
-    <button id="tabScanner" style="flex: 1; padding: 10px; border: none; border-radius: 10px; font-size: 0.85rem; font-weight: 700; cursor: pointer; background: var(--primary); color: #121212; transition: all 0.2s;">🔍 Barcode Scanner</button>
-    <button id="tabPos" style="flex: 1; padding: 10px; border: none; border-radius: 10px; font-size: 0.85rem; font-weight: 700; cursor: pointer; background: transparent; color: var(--text-muted); transition: all 0.2s;">💼 POS Cashier</button>
-  </div>
-
-  <!-- Main Panel -->
-  <div class="panel" id="scannerPanel">
-    
-    <!-- Viewfinder -->
-    <div class="scanner-container">
-      <div id="reader"></div>
-      <div class="scanner-overlay" id="overlayContainer">
-        <div class="focus-box" id="focusBox">
-          <div class="laser-line"></div>
-          <div class="corner corner-tl"></div>
-          <div class="corner corner-tr"></div>
-          <div class="corner corner-bl"></div>
-          <div class="corner corner-br"></div>
-        </div>
-      </div>
-    </div>
-
-    <!-- Scanner Settings & Actions -->
-    <div class="config-grid">
-      <div style="display: flex; gap: 8px;">
-        <button class="btn" style="flex: 1;" id="btnStart">Start Camera</button>
-        <button class="btn btn-secondary" style="display:none;" id="btnStop">Stop</button>
-      </div>
-
-      <div class="form-group" id="cameraSelectGroup" style="display: none;">
-        <label for="cameraSelect">Select Camera</label>
-        <select id="cameraSelect">
-          <option value="">Detecting Cameras...</option>
-        </select>
-      </div>
-    </div>
-
-  </div>
-
-  <!-- Session Link Setup Panel -->
-  <div class="panel" id="linkingPanel">
-    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
-      <h2 class="scans-title" style="margin-bottom: 0;">Setup Connection</h2>
-      <button class="btn btn-secondary" id="btnInstall" style="display: none; padding: 6px 12px; font-size: 0.75rem; border-radius: 8px;">+ Add to Home</button>
-    </div>
-    <div class="config-grid">
-      <div class="form-group">
-        <label for="sessionInput">Link Session Code (From Laptop)</label>
-        <div style="display: flex; gap: 8px;">
-          <input type="text" id="sessionInput" placeholder="e.g. ASIM-4821" style="text-transform: uppercase;">
-          <button class="btn" id="btnLink" style="padding: 10px 20px;">Link</button>
-        </div>
-      </div>
-      
-      <div class="form-group" style="margin-top: 4px;">
-        <label for="manualBarcode">Or Enter Barcode Manually</label>
-        <div style="display: flex; gap: 8px;">
-          <input type="number" id="manualBarcode" placeholder="Enter barcode number">
-          <button class="btn btn-secondary" id="btnSendManual" style="padding: 10px 15px;">Send</button>
-        </div>
-      </div>
-    </div>
-  </div>
-
-  <!-- Recent Scans log -->
-  <div class="panel" id="recentScansPanel" style="flex: 1; min-height: 180px;">
-    <h2 class="scans-title">
-      <span>Recent Scans</span>
-      <span style="font-size: 0.65rem; color: var(--text-muted);" id="scanCount">Total: 0</span>
-    </h2>
-    <div class="scans-list" id="scansList">
-      <div style="text-align: center; color: var(--text-muted); font-size: 0.8rem; padding: 20px 0;" id="emptyListMsg">
-        No recent scans. Ready to capture!
-      </div>
-    </div>
-  </div>
-
-  <!-- Mobile POS Cashier Panel -->
-  <div class="panel" id="posPanel" style="display: none; flex: 1;">
-    <h2 class="scans-title">
-      <span>POS Cashier</span>
-      <span style="font-size: 0.75rem; color: var(--text-muted);" id="posStatusText">Not Connected</span>
-    </h2>
-    
-    <!-- Product Catalog Search -->
-    <div class="form-group" style="margin-bottom: 8px;">
-      <label for="posSearch">Search Synced Catalog</label>
-      <input type="text" id="posSearch" placeholder="Search product name or brand...">
-    </div>
-    
-    <!-- Product List -->
-    <div style="max-height: 220px; overflow-y: auto; display: flex; flex-direction: column; gap: 8px; margin-bottom: 12px; border-bottom: 1.5px solid var(--border-glass); padding-bottom: 10px;" id="posProductsList">
-      <div style="text-align: center; color: var(--text-muted); font-size: 0.8rem; padding: 20px 0;">
-        Waiting for laptop connection to sync products...
-      </div>
-    </div>
-
-    <!-- Mobile POS Cart -->
-    <h2 class="scans-title" style="margin-bottom: 4px;">
-      <span>Mobile POS Cart</span>
-      <span style="font-size: 0.75rem; color: var(--text-muted);" id="posCartCount">Items: 0</span>
-    </h2>
-    <div style="max-height: 200px; overflow-y: auto; display: flex; flex-direction: column; gap: 8px; margin-bottom: 16px; border-bottom: 1.5px solid var(--border-glass); padding-bottom: 10px;" id="posCartList">
-      <div style="text-align: center; color: var(--text-muted); font-size: 0.8rem; padding: 20px 0;" id="posEmptyCartMsg">
-        Cart is empty. Tap products above to add!
-      </div>
-    </div>
-
-    <!-- Checkout Details Slide-up -->
-    <div style="background: rgba(255,255,255,0.02); padding: 12px; border-radius: 16px; border: 1px solid rgba(255,255,255,0.05); display: flex; flex-direction: column; gap: 10px;">
-      <div style="display: flex; gap: 8px; justify-content: space-between; align-items: center;">
-        <span style="font-size: 0.8rem; font-weight: bold; color: var(--primary);">Customer</span>
-        <button type="button" id="btnPosWalkIn" style="font-size: 0.7rem; background: var(--primary); color: black; border: none; padding: 3px 8px; border-radius: 6px; cursor: pointer; font-weight: bold;">Walk-in</button>
-      </div>
-      <div style="display: grid; grid-template-columns: 1.2fr 1fr; gap: 8px;">
-        <input type="text" id="posCustName" placeholder="Customer Name" style="padding: 8px; font-size: 0.8rem;">
-        <input type="tel" id="posCustPhone" placeholder="Phone Number" style="padding: 8px; font-size: 0.8rem;">
-      </div>
-      
-      <div style="display: grid; grid-template-columns: 1fr 1.2fr; gap: 8px; margin-top: 4px;">
-        <div>
-          <label style="font-size: 0.65rem; color: var(--text-muted);">Discount (PKR)</label>
-          <input type="number" id="posDiscount" placeholder="0" style="padding: 8px; font-size: 0.8rem;" value="0">
-        </div>
-        <div>
-          <label style="font-size: 0.65rem; color: var(--text-muted);" id="posAmountPaidLabel">Amount Paid (PKR)</label>
-          <input type="number" id="posAmountPaid" placeholder="0" style="padding: 8px; font-size: 0.8rem;">
-        </div>
-      </div>
-
-      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 4px;">
-        <div>
-          <label style="font-size: 0.65rem; color: var(--text-muted);">Payment Method</label>
-          <div style="display: flex; gap: 4px; background: rgba(255,255,255,0.03); padding: 2px; border-radius: 8px;">
-            <button type="button" id="btnPosPayCash" style="flex: 1; padding: 6px; font-size: 0.7rem; border: none; border-radius: 6px; cursor: pointer; background: var(--primary); color: black; font-weight: bold;">Cash</button>
-            <button type="button" id="btnPosPayBank" style="flex: 1; padding: 6px; font-size: 0.7rem; border: none; border-radius: 6px; cursor: pointer; background: transparent; color: var(--text-muted);">Bank</button>
-          </div>
-        </div>
-        <div>
-          <label style="font-size: 0.65rem; color: var(--text-muted);">Sale Type</label>
-          <div style="display: flex; gap: 4px; background: rgba(255,255,255,0.03); padding: 2px; border-radius: 8px;">
-            <button type="button" id="btnPosTypePhysical" style="flex: 1; padding: 6px; font-size: 0.7rem; border: none; border-radius: 6px; cursor: pointer; background: var(--primary); color: black; font-weight: bold;">Physical</button>
-            <button type="button" id="btnPosTypeOnline" style="flex: 1; padding: 6px; font-size: 0.7rem; border: none; border-radius: 6px; cursor: pointer; background: transparent; color: var(--text-muted);">Online</button>
-          </div>
-        </div>
-      </div>
-
-      <div style="display: flex; justify-content: space-between; font-size: 1.1rem; font-weight: 800; border-top: 1px dashed rgba(255,255,255,0.1); padding-top: 10px; margin-top: 4px;">
-        <span>Payable Total:</span>
-        <span style="color: var(--primary);" id="posTotalText">PKR 0</span>
-      </div>
-
-      <button type="button" class="btn" id="btnPosCheckout" style="width: 100%; padding: 12px; margin-top: 6px;">
-        Complete POS Sale
-      </button>
-    </div>
-  </div>
-
-  <!-- Scan Notification Toast -->
-  <div class="scan-toast" id="scanToast">
-    Barcode Sent Successfully!
-  </div>
-
-  <!-- Firebase Configuration Input Modal (Fallback if default public isn't wanted) -->
-  <div class="modal" id="configModal">
-    <div class="modal-content">
-      <h3>Custom Firebase Setup</h3>
-      <p>Enter your Firebase Project configuration details to link your dedicated scanner database.</p>
-      <div class="config-grid" style="text-align: left; margin-bottom: 16px;">
-        <div class="form-group">
-          <label>Database URL</label>
-          <input type="text" id="fbDbUrl" placeholder="https://your-app-default-rtdb.firebaseio.com">
-        </div>
-        <div class="form-group">
-          <label>API Key</label>
-          <input type="text" id="fbApiKey" placeholder="AIzaSy...">
-        </div>
-        <div class="form-group">
-          <label>Project ID</label>
-          <input type="text" id="fbProjId" placeholder="your-project-id">
-        </div>
-      </div>
-      <div style="display: flex; gap: 8px;">
-        <button class="btn" id="btnSaveConfig" style="flex: 1.2;">Save Config</button>
-        <button class="btn btn-secondary" id="btnCancelConfig" style="flex: 1;">Use Demo</button>
-      </div>
-    </div>
-  </div>
-
-  <!-- Remote Invoice Completed Modal -->
-  <div class="modal" id="invoiceModal">
-    <div class="modal-content" style="max-width: 380px; text-align: left; background: #ffffff; color: #000000; border: none; padding: 24px; font-family: 'Plus Jakarta Sans', sans-serif;">
-      <h2 style="text-align: center; margin: 0 0 10px 0; font-weight: 800; font-size: 18px; color: #000000; letter-spacing: 0.5px;">ABU ASIM DIGITAL RECEIPT</h2>
-      <div style="text-align: center; font-size: 10px; color: #956e36; letter-spacing: 1.5px; text-transform: uppercase; font-weight: bold; margin-top: -8px; margin-bottom: 12px;">Perfumery</div>
-      
-      <div style="font-size: 11px; border-bottom: 1px solid #ddd; padding-bottom: 6px; margin-bottom: 12px; display: flex; flex-direction: column; gap: 2px; color: #000000;">
-        <div><b>Customer Name:</b> <span id="invCustName">Walk-in</span></div>
-        <div><b>Date:</b> <span id="invDate">May 24, 2026</span></div>
-        <div><b>Invoice ID:</b> <span id="invId">#A832B</span></div>
-      </div>
-      
-      <table style="width: 100%; border-collapse: collapse; margin-bottom: 12px; font-size: 11px; color: #000000;">
-        <thead>
-          <tr style="border-bottom: 1.5px solid #000000; text-align: left; font-weight: 800;">
-            <th style="padding: 4px 0;">Item</th>
-            <th style="padding: 4px 0; text-align: center;">Qty</th>
-            <th style="padding: 4px 0; text-align: right;">Total</th>
-          </tr>
-        </thead>
-        <tbody id="invItemsBody">
-          <!-- Dynamic Items -->
-        </tbody>
-      </table>
-
-      <div style="text-align: right; border-top: 1.5px solid #000000; padding-top: 6px; display: flex; flex-direction: column; gap: 3px; font-size: 12px; color: #000000;">
-        <div style="display: flex; justify-content: space-between;"><span style="color: #444;">Subtotal:</span><span id="invSubtotal">PKR 0</span></div>
-        <div style="display: flex; justify-content: space-between;" id="invDiscountRow"><span style="color: #444;">Discount:</span><span id="invDiscount">-PKR 0</span></div>
-        <div style="display: flex; justify-content: space-between; font-weight: 800; font-size: 13px; border-top: 1px dashed #ddd; padding-top: 4px;" class="grand-total">
-          <span>Grand Total:</span><span id="invTotal">PKR 0</span>
-        </div>
-        <div style="display: flex; justify-content: space-between;"><span style="color: #444;">Received:</span><span id="invReceived">PKR 0</span></div>
-        <div style="display: flex; justify-content: space-between; font-weight: 800;"><span id="invBalanceLabel">Baqaya (Change):</span><span id="invBalance">PKR 0</span></div>
-      </div>
-
-      <div style="display: flex; gap: 8px; margin-top: 20px;">
-        <button type="button" class="btn" id="btnPosWhatsApp" style="flex: 1.2; background: #25D366; color: #ffffff; box-shadow: 0 4px 15px rgba(37, 211, 102, 0.25);">
-          WhatsApp Share
-        </button>
-        <button type="button" class="btn btn-secondary" id="btnPosCloseInvoice" style="flex: 1; border: 1px solid #ddd; color: #000; background: #f4f4f5;">
-          New Sale
-        </button>
-      </div>
-    </div>
-  </div>
-
-  <script>
-    // ─── PWA & Service Worker ───────────
-    if ('serviceWorker' in navigator) {
-      window.addEventListener('load', () => {
-        navigator.serviceWorker.register('./sw.js').catch(err => console.log('SW registration failed: ', err));
-      });
-    }
-
-    let deferredPrompt;
-    const btnInstall = document.getElementById('btnInstall');
-    window.addEventListener('beforeinstallprompt', (e) => {
-      e.preventDefault();
-      deferredPrompt = e;
-      btnInstall.style.display = 'block';
-    });
-
-    btnInstall.addEventListener('click', async () => {
-      if (deferredPrompt) {
-        deferredPrompt.prompt();
-        const { outcome } = await deferredPrompt.userChoice;
-        if (outcome === 'accepted') {
-          btnInstall.style.display = 'none';
-        }
-        deferredPrompt = null;
-      }
-    });
-
-    // ─── Splash Screen Auto-Hide after 3 seconds ───────────
-    window.addEventListener('load', () => {
-      setTimeout(() => {
-        const splash = document.getElementById('splashScreen');
-        if (splash) splash.classList.add('hidden');
-      }, 3000);
-    });
-
-    // ─── Passkey Logic ───────────
-    const passkeyScreen = document.getElementById('passkeyScreen');
-    const passkeyInput = document.getElementById('passkeyInput');
-    const btnUnlock = document.getElementById('btnUnlock');
-    const CORRECT_PIN = 'AbuAsim786';
-
-    function checkPin() {
-      if(passkeyInput.value === CORRECT_PIN) {
-        passkeyInput.blur(); // Dismiss virtual mobile keyboard
-        passkeyScreen.classList.add('hidden');
-        localStorage.setItem('scanner_unlocked', 'true'); // Permanent unlock
-      } else {
-        passkeyInput.classList.add('error-shake');
-        if("vibrate" in navigator) navigator.vibrate(200); // Error vibration
-        setTimeout(() => {
-          passkeyInput.classList.remove('error-shake');
-        }, 400);
-      }
-    }
-
-    btnUnlock.addEventListener('click', checkPin);
-    passkeyInput.addEventListener('keypress', (e) => {
-      if(e.key === 'Enter') checkPin();
-    });
-
-    // Check if already unlocked (PERMANENTLY - no expiry)
-    const isUnlocked = localStorage.getItem('scanner_unlocked');
-    if(isUnlocked === 'true') {
-      passkeyScreen.classList.add('hidden');
-    }
-
-    // Lock button — clears unlock & shows passkey screen again
-    const btnLock = document.getElementById('btnLock');
-    if(btnLock) {
-      btnLock.addEventListener('click', () => {
-        localStorage.removeItem('scanner_unlocked');
-        passkeyInput.value = '';
-        passkeyScreen.classList.remove('hidden');
-      });
-    }
-
-    // --- Dynamic Beep Sound using Web Audio API (No audio file needed!) ---
-    function playBeepSound() {
-      try {
-        const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-        const oscillator = audioCtx.createOscillator();
-        const gainNode = audioCtx.createGain();
-
-        oscillator.connect(gainNode);
-        gainNode.connect(audioCtx.destination);
-
-        oscillator.type = 'sine';
-        oscillator.frequency.setValueAtTime(1200, audioCtx.currentTime); // 1200Hz frequency (perfect scanner beep)
+    <!-- Fullscreen PWA Install Onboarding Overlay -->
+    <div id="pwa-install-overlay" class="pwa-install-overlay hidden">
+        <div class="ambient-glow glow-1"></div>
+        <div class="ambient-glow glow-2"></div>
         
-        // Fast rise and fall volume to make it snappy
-        gainNode.gain.setValueAtTime(0, audioCtx.currentTime);
-        gainNode.gain.linearRampToValueAtTime(0.3, audioCtx.currentTime + 0.02);
-        gainNode.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.15);
-
-        oscillator.start(audioCtx.currentTime);
-        oscillator.stop(audioCtx.currentTime + 0.16);
-      } catch (e) {
-        console.warn("Audio Context beep failed", e);
-      }
-    }
-
-    // Dynamic Haptic Feedback (Vibration)
-    function triggerVibration() {
-      if (navigator.vibrate) {
-        navigator.vibrate(100); // 100ms vibration
-      }
-    }
-
-    // --- State Management ---
-    let html5QrScanner = null;
-    let firebaseDb = null;
-    let currentSessionId = "";
-    let isLinked = false;
-    let desktopConnectionListener = null;
-
-    // Load configurations
-    const DEFAULT_CONFIG = {
-      apiKey: "AIzaSyA40o61sx09xzT-lArCUdZeSDxoFGDETX4",
-      authDomain: "abuasimsystem.firebaseapp.com",
-      databaseURL: "https://abuasimsystem-default-rtdb.firebaseio.com",
-      projectId: "abuasimsystem",
-      storageBucket: "abuasimsystem.firebasestorage.app",
-      messagingSenderId: "191271312164",
-      appId: "1:191271312164:web:6e01b02f90a65e1a1031b1"
-    };
-
-    // --- UI Elements ---
-    const badgeEl = document.getElementById("connectionBadge");
-    const badgeTextEl = document.getElementById("connectionText");
-    const btnStart = document.getElementById("btnStart");
-    const btnStop = document.getElementById("btnStop");
-    const cameraSelectGroup = document.getElementById("cameraSelectGroup");
-    const cameraSelect = document.getElementById("cameraSelect");
-    const focusBox = document.getElementById("focusBox");
-    const sessionInput = document.getElementById("sessionInput");
-    const btnLink = document.getElementById("btnLink");
-    const manualBarcode = document.getElementById("manualBarcode");
-    const btnSendManual = document.getElementById("btnSendManual");
-    const scansList = document.getElementById("scansList");
-    const emptyListMsg = document.getElementById("emptyListMsg");
-    const scanCountEl = document.getElementById("scanCount");
-    const toast = document.getElementById("scanToast");
-
-    // --- Setup Status Indicator ---
-    function updateStatus(state, customMessage = "") {
-      badgeEl.className = "status-badge " + state;
-      isLinked = (state === 'linked');
-      
-      switch(state) {
-        case 'offline':
-          badgeTextEl.innerText = customMessage || "Offline";
-          break;
-        case 'connecting':
-          badgeTextEl.innerText = "Connecting...";
-          break;
-        case 'ready':
-          badgeTextEl.innerText = "Connected";
-          break;
-        case 'linked':
-          badgeTextEl.innerText = "Linked: " + currentSessionId;
-          break;
-      }
-    }
-
-    // --- Initialize Firebase ---
-    function initFirebase() {
-      updateStatus('connecting');
-      try {
-        // Load custom or default config
-        let config = DEFAULT_CONFIG;
-        const savedConfig = localStorage.getItem('fb_config');
-        if (savedConfig) {
-          try { config = JSON.parse(savedConfig); } catch(e){}
-        }
-
-        // Initialize Firebase app if not already initialized
-        if (!firebase.apps.length) {
-          firebase.initializeApp(config);
-        }
-        
-        firebaseDb = firebase.database();
-        updateStatus('ready');
-        
-        // Auto-Link if we have a saved session
-        const savedSession = localStorage.getItem('saved_session_id');
-        if (savedSession) {
-          sessionInput.value = savedSession;
-          linkSession(savedSession);
-        }
-      } catch (err) {
-        console.error("Firebase init error:", err);
-        updateStatus('offline', "Database Error");
-      }
-    }
-
-    // --- Link Mobile App to Desktop App Session ---
-    function linkSession(sessionId) {
-      if (!firebaseDb) {
-        alert("Firebase is not initialized yet!");
-        return;
-      }
-      
-      sessionId = sessionId.trim().toUpperCase();
-      if (!sessionId) {
-        alert("Please enter a valid Session Code!");
-        return;
-      }
-      
-      updateStatus('connecting');
-      currentSessionId = sessionId;
-      localStorage.setItem('saved_session_id', sessionId);
-
-      // Setup Heartbeat to let desktop know mobile is active
-      const mobileStatusRef = firebaseDb.ref(`sessions/${sessionId}/mobile_active`);
-      mobileStatusRef.set(true);
-      mobileStatusRef.onDisconnect().set(false);
-
-      // Listen to Desktop App Active heartbeat status
-      if (desktopConnectionListener) {
-        firebaseDb.ref(`sessions/${sessionId}/desktop_active`).off();
-      }
-
-      desktopConnectionListener = firebaseDb.ref(`sessions/${sessionId}/desktop_active`);
-      desktopConnectionListener.on('value', (snapshot) => {
-        const isDesktopOnline = snapshot.val() === true;
-        if (isDesktopOnline) {
-          updateStatus('linked');
-        } else {
-          updateStatus('ready', "Waiting for Laptop");
-        }
-      });
-
-      // Listen to product catalog updates synced from laptop
-      firebaseDb.ref(`sessions/${sessionId}/products`).on('value', (snapshot) => {
-        syncedProducts = snapshot.val() || [];
-        const posStatusText = document.getElementById("posStatusText");
-        if (posStatusText) posStatusText.innerText = "Linked: " + syncedProducts.length + " Products";
-        renderPosProducts();
-      });
-
-      // Listen to mobile checkout transaction complete responses
-      firebaseDb.ref(`sessions/${sessionId}/mobile_sale_result`).on('value', (snapshot) => {
-        const result = snapshot.val();
-        if (!result || !result.timestamp || result.timestamp <= lastSaleResultTimestamp) return;
-        lastSaleResultTimestamp = result.timestamp;
-        
-        updatePosCheckoutButtonState(false);
-        
-        if (result.success) {
-          playBeepSound();
-          if (navigator.vibrate) navigator.vibrate([100, 50, 100]);
-          showMobileInvoice(result);
-        } else {
-          alert("Checkout failed: " + (result.error || "Unknown error"));
-        }
-      });
-    }
-
-    btnLink.addEventListener('click', () => {
-      linkSession(sessionInput.value);
-    });
-
-    // --- Barcode Pushed to Firebase ---
-    function pushBarcode(barcode) {
-      if (!firebaseDb) {
-        alert("Database not connected!");
-        return;
-      }
-      if (!isLinked) {
-        alert("Please link with your laptop first using the Session Code!");
-        return;
-      }
-
-      // Vibrate & Beep!
-      playBeepSound();
-      triggerVibration();
-
-      const timestamp = Date.now();
-      
-      // Update session barcode in real-time
-      firebaseDb.ref(`sessions/${currentSessionId}`).update({
-        barcode: barcode,
-        barcode_timestamp: timestamp
-      }).then(() => {
-        // Show success Toast
-        toast.innerText = `Sent: ${barcode}`;
-        toast.className = "scan-toast active";
-        setTimeout(() => toast.className = "scan-toast", 2500);
-
-        // Add to recent UI list
-        addScanToUI(barcode, timestamp);
-      }).catch(err => {
-        console.error("Write error:", err);
-        alert("Error sending barcode to database");
-      });
-    }
-
-    // --- UI Scans Log manager ---
-    let totalScans = 0;
-    function addScanToUI(barcode, timestamp) {
-      totalScans++;
-      scanCountEl.innerText = `Total: ${totalScans}`;
-      
-      if (emptyListMsg) {
-        emptyListMsg.style.display = 'none';
-      }
-
-      const item = document.createElement('div');
-      item.className = "scan-item";
-      
-      const timeStr = new Date(timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
-      
-      item.innerHTML = `
-        <div>
-          <div class="scan-barcode">${barcode}</div>
-          <div class="scan-time">${timeStr}</div>
-        </div>
-        <div class="scan-status">✔ Sent</div>
-      `;
-
-      scansList.insertBefore(item, scansList.firstChild);
-      
-      // Keep list small
-      if (scansList.children.length > 10) {
-        scansList.removeChild(scansList.lastChild);
-      }
-    }
-
-    // Manual input dispatch
-    btnSendManual.addEventListener('click', () => {
-      const code = manualBarcode.value.trim();
-      if (!code) return;
-      pushBarcode(code);
-      manualBarcode.value = "";
-    });
-
-    // --- Camera Handling using HTML5-Qrcode library ---
-    let lastScanTime = 0;
-    let lastScannedText = "";
-    
-    function startCamera(cameraId) {
-      btnStart.style.display = "none";
-      btnStop.style.display = "block";
-      focusBox.className = "focus-box scanning";
-
-      const formats = window.Html5QrcodeSupportedFormats ? [
-        Html5QrcodeSupportedFormats.EAN_13,
-        Html5QrcodeSupportedFormats.EAN_8,
-        Html5QrcodeSupportedFormats.CODE_128,
-        Html5QrcodeSupportedFormats.QR_CODE
-      ] : [];
-
-      try {
-        html5QrScanner = new Html5Qrcode("reader", {
-          formatsToSupport: formats
-        });
-      } catch (e) {
-        html5QrScanner = new Html5Qrcode("reader");
-      }
-
-      const config = {
-        fps: 25, // Higher frame rate for much faster focus detection
-        qrbox: (width, height) => {
-          // Square scanning box optimized for both small QR codes and 1D EAN barcodes
-          const size = Math.floor(Math.min(width, height) * 0.70);
-          return { width: size, height: size };
-        },
-        aspectRatio: 1.0
-      };
-
-      const executeStart = (constraints) => {
-        html5QrScanner.start(
-          constraints,
-          config,
-          (decodedText, decodedResult) => {
-            const now = Date.now();
-            if (decodedText === lastScannedText) {
-              // Same barcode: enforce 2.0 seconds debounce
-              if (now - lastScanTime > 2000) {
-                lastScanTime = now;
-                pushBarcode(decodedText);
-              }
-            } else {
-              // Different barcode: scan instantly!
-              lastScannedText = decodedText;
-              lastScanTime = now;
-              pushBarcode(decodedText);
-            }
-          },
-          (errorMessage) => {
-            // Silent - triggers very often on failure to detect in a frame
-          }
-        ).then(() => {
-          // Populate camera select dropdown
-          Html5Qrcode.getCameras().then(devices => {
-            if (devices && devices.length > 0) {
-              cameraSelectGroup.style.display = "flex";
-              cameraSelect.innerHTML = "";
-              devices.forEach(device => {
-                const opt = document.createElement("option");
-                opt.value = device.id;
-                opt.innerText = device.label || `Camera ${cameraSelect.length + 1}`;
-                if (cameraId && device.id === cameraId) {
-                  opt.selected = true;
-                } else if (!cameraId && constraints.deviceId && constraints.deviceId.exact === device.id) {
-                  opt.selected = true;
-                }
-                cameraSelect.appendChild(opt);
-              });
-            }
-          }).catch(err => console.warn(err));
-        }).catch(err => {
-          console.error("Camera start failed:", err);
-          alert("Camera Permission Denied or Not Supported on this device. Please grant permissions.");
-          stopCamera();
-        });
-      };
-
-      if (cameraId) {
-        executeStart({ deviceId: { exact: cameraId } });
-      } else {
-        // Fetch cameras FIRST before starting
-        Html5Qrcode.getCameras().then(devices => {
-          if (devices && devices.length > 0) {
-            let backCamera = devices.find(d => d.label.toLowerCase().includes('back') || d.label.toLowerCase().includes('environment'));
-            if (!backCamera) backCamera = devices[devices.length - 1]; // Fallback to last camera on list (usually back)
-            executeStart({ deviceId: { exact: backCamera.id } });
-          } else {
-            // Fallback for browsers that require start before enumeration
-            executeStart({ facingMode: "environment" });
-          }
-        }).catch(err => {
-          executeStart({ facingMode: "environment" });
-        });
-      }
-    }
-
-    function stopCamera() {
-      btnStart.style.display = "block";
-      btnStop.style.display = "none";
-      focusBox.className = "focus-box";
-      
-      if (html5QrScanner) {
-        html5QrScanner.stop().then(() => {
-          html5QrScanner = null;
-        }).catch(err => console.error(err));
-      }
-    }
-
-    btnStart.addEventListener('click', () => startCamera());
-    btnStop.addEventListener('click', stopCamera);
-    
-    cameraSelect.addEventListener('change', (e) => {
-      const selectedId = e.target.value;
-      if (selectedId) {
-        if (html5QrScanner) {
-          html5QrScanner.stop().then(() => {
-            startCamera(selectedId);
-          });
-        } else {
-          startCamera(selectedId);
-        }
-      }
-    });
-
-    // --- Mobile POS Cashier Logic ---
-    let syncedProducts = [];
-    let posCart = [];
-    let isPosCheckoutLoading = false;
-    let lastSaleResultTimestamp = 0;
-    let selectedPosCustomer = { name: "", phone: "", id: "" };
-    let posPaymentMethod = "Cash";
-    let posSaleType = "Physical";
-
-    const tabScanner = document.getElementById("tabScanner");
-    const tabPos = document.getElementById("tabPos");
-    const posPanel = document.getElementById("posPanel");
-    const scannerPanel = document.getElementById("scannerPanel");
-    const linkingPanel = document.getElementById("linkingPanel");
-    const recentScansPanel = document.getElementById("recentScansPanel");
-
-    const posSearch = document.getElementById("posSearch");
-    const posProductsList = document.getElementById("posProductsList");
-    const posCartList = document.getElementById("posCartList");
-    const posEmptyCartMsg = document.getElementById("posEmptyCartMsg");
-    const posCartCount = document.getElementById("posCartCount");
-    const posTotalText = document.getElementById("posTotalText");
-    const btnPosCheckout = document.getElementById("btnPosCheckout");
-
-    const posCustName = document.getElementById("posCustName");
-    const posCustPhone = document.getElementById("posCustPhone");
-    const btnPosWalkIn = document.getElementById("btnPosWalkIn");
-    const posDiscount = document.getElementById("posDiscount");
-    const posAmountPaid = document.getElementById("posAmountPaid");
-    const posAmountPaidLabel = document.getElementById("posAmountPaidLabel");
-
-    const btnPosPayCash = document.getElementById("btnPosPayCash");
-    const btnPosPayBank = document.getElementById("btnPosPayBank");
-    const btnPosTypePhysical = document.getElementById("btnPosTypePhysical");
-    const btnPosTypeOnline = document.getElementById("btnPosTypeOnline");
-
-    // Modal Receipt elements
-    const invoiceModal = document.getElementById("invoiceModal");
-    const invCustName = document.getElementById("invCustName");
-    const invDate = document.getElementById("invDate");
-    const invId = document.getElementById("invId");
-    const invItemsBody = document.getElementById("invItemsBody");
-    const invSubtotal = document.getElementById("invSubtotal");
-    const invDiscountRow = document.getElementById("invDiscountRow");
-    const invDiscount = document.getElementById("invDiscount");
-    const invTotal = document.getElementById("invTotal");
-    const invReceived = document.getElementById("invReceived");
-    const invBalanceLabel = document.getElementById("invBalanceLabel");
-    const invBalance = document.getElementById("invBalance");
-    const btnPosWhatsApp = document.getElementById("btnPosWhatsApp");
-    const btnPosCloseInvoice = document.getElementById("btnPosCloseInvoice");
-
-    // Toggle Payment Method
-    btnPosPayCash.onclick = () => {
-      posPaymentMethod = "Cash";
-      btnPosPayCash.style.background = "var(--primary)";
-      btnPosPayCash.style.color = "black";
-      btnPosPayCash.style.fontWeight = "bold";
-      btnPosPayBank.style.background = "transparent";
-      btnPosPayBank.style.color = "var(--text-muted)";
-    };
-    btnPosPayBank.onclick = () => {
-      posPaymentMethod = "Bank";
-      btnPosPayBank.style.background = "var(--primary)";
-      btnPosPayBank.style.color = "black";
-      btnPosPayBank.style.fontWeight = "bold";
-      btnPosPayCash.style.background = "transparent";
-      btnPosPayCash.style.color = "var(--text-muted)";
-    };
-
-    // Toggle Sale Type
-    btnPosTypePhysical.onclick = () => {
-      posSaleType = "Physical";
-      btnPosTypePhysical.style.background = "var(--primary)";
-      btnPosTypePhysical.style.color = "black";
-      btnPosTypePhysical.style.fontWeight = "bold";
-      btnPosTypeOnline.style.background = "transparent";
-      btnPosTypeOnline.style.color = "var(--text-muted)";
-    };
-    btnPosTypeOnline.onclick = () => {
-      posSaleType = "Online";
-      btnPosTypeOnline.style.background = "var(--primary)";
-      btnPosTypeOnline.style.color = "black";
-      btnPosTypeOnline.style.fontWeight = "bold";
-      btnPosTypePhysical.style.background = "transparent";
-      btnPosTypePhysical.style.color = "var(--text-muted)";
-    };
-
-    // Walk-in Customer Shortcut
-    btnPosWalkIn.onclick = () => {
-      selectedPosCustomer = { name: "Walk-in Customer", phone: "Guest", id: "guest" };
-      posCustName.value = "Walk-in Customer";
-      posCustPhone.value = "Guest";
-      posCustPhone.readOnly = true;
-      posAmountPaid.style.display = "none";
-      posAmountPaidLabel.style.display = "none";
-      renderPosCart();
-    };
-
-    // Customer detail inputs
-    posCustName.oninput = (e) => {
-      selectedPosCustomer.name = e.target.value;
-      if (selectedPosCustomer.id === 'guest') {
-        selectedPosCustomer.id = '';
-        selectedPosCustomer.phone = '';
-        posCustPhone.value = '';
-        posCustPhone.readOnly = false;
-        posAmountPaid.style.display = "block";
-        posAmountPaidLabel.style.display = "block";
-      }
-    };
-    posCustPhone.oninput = (e) => {
-      selectedPosCustomer.phone = e.target.value;
-    };
-
-    // Toggle main PWA layouts
-    if (tabScanner && tabPos) {
-      tabScanner.onclick = () => {
-        tabScanner.style.background = "var(--primary)";
-        tabScanner.style.color = "#121212";
-        tabPos.style.background = "transparent";
-        tabPos.style.color = "var(--text-muted)";
-        
-        posPanel.style.display = "none";
-        scannerPanel.style.display = "flex";
-        linkingPanel.style.display = "flex";
-        recentScansPanel.style.display = "flex";
-      };
-
-      tabPos.onclick = () => {
-        tabPos.style.background = "var(--primary)";
-        tabPos.style.color = "#121212";
-        tabScanner.style.background = "transparent";
-        tabScanner.style.color = "var(--text-muted)";
-        
-        posPanel.style.display = "flex";
-        scannerPanel.style.display = "none";
-        linkingPanel.style.display = "none";
-        recentScansPanel.style.display = "none";
-        
-        renderPosProducts();
-      };
-    }
-
-    // Render Sync Catalog in POS
-    function renderPosProducts() {
-      if (!posProductsList) return;
-      
-      const searchVal = posSearch.value.toLowerCase().trim();
-      const filtered = syncedProducts.filter(p => 
-        (p.name || '').toLowerCase().includes(searchVal) || 
-        (p.brand || '').toLowerCase().includes(searchVal)
-      );
-
-      if (filtered.length === 0) {
-        posProductsList.innerHTML = `<div style="text-align: center; color: var(--text-muted); font-size: 0.8rem; padding: 20px 0;">No products match your search.</div>`;
-        return;
-      }
-
-      posProductsList.innerHTML = "";
-      filtered.forEach(p => {
-        const item = document.createElement("div");
-        item.style.display = "flex";
-        item.style.alignItems = "center";
-        item.style.gap = "10px";
-        item.style.padding = "8px 12px";
-        item.style.background = "rgba(255,255,255,0.01)";
-        item.style.border = "1px solid rgba(255,255,255,0.03)";
-        item.style.borderRadius = "12px";
-        item.style.cursor = "pointer";
-        item.style.transition = "transform 0.1s";
-
-        item.onclick = () => {
-          addPosProductToCart(p);
-          item.style.transform = "scale(0.97)";
-          setTimeout(() => item.style.transform = "", 100);
-        };
-
-        const isLowStock = p.stock <= 5;
-
-        item.innerHTML = `
-          <div style="width: 36px; height: 36px; border-radius: 6px; background: rgba(255,255,255,0.04); overflow: hidden; display: flex; align-items: center; justify-content: center; flex-shrink: 0; border: 1px solid rgba(255,255,255,0.08);">
-            ${p.imageUrl ? `<img src="${p.imageUrl}" style="width: 100%; height: 100%; object-fit: cover;">` : `<span style="font-size:0.8rem;opacity:0.3;">📦</span>`}
-          </div>
-          <div style="flex: 1; min-width: 0;">
-            <div style="font-size: 0.85rem; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: var(--text-main);">${p.name}</div>
-            <div style="font-size: 0.7rem; color: var(--text-muted);">${p.brand ? p.brand : 'No Brand'} ${p.volume ? `• ${p.volume}ml` : ''}</div>
-          </div>
-          <div style="text-align: right; flex-shrink:0;">
-            <div style="font-size: 0.85rem; font-weight: bold; color: var(--primary);">PKR ${p.sellingPrice}</div>
-            <div style="font-size: 0.7rem; font-weight: 600; color: ${isLowStock ? 'var(--danger)' : 'var(--success)'};">${p.stock} units</div>
-          </div>
-        `;
-
-        posProductsList.appendChild(item);
-      });
-    }
-
-    posSearch.oninput = renderPosProducts;
-
-    // Cart Management
-    function addPosProductToCart(product) {
-      if (product.stock <= 0) {
-        alert("⚠️ Out of Stock!");
-        return;
-      }
-      
-      const existing = posCart.find(item => item.id === product.id);
-      if (existing) {
-        if (existing.quantity >= product.stock) {
-          alert("⚠️ Insufficient Stock!");
-          return;
-        }
-        existing.quantity += 1;
-      } else {
-        posCart.push({ ...product, quantity: 1 });
-      }
-      
-      playBeepSound();
-      renderPosCart();
-    }
-
-    function updatePosCartQty(productId, delta) {
-      const existing = posCart.find(item => item.id === productId);
-      if (!existing) return;
-      
-      const newQty = existing.quantity + delta;
-      if (newQty <= 0) {
-        posCart = posCart.filter(item => item.id !== productId);
-      } else {
-        if (newQty > existing.stock) {
-          alert("⚠️ Insufficient Stock!");
-          return;
-        }
-        existing.quantity = newQty;
-      }
-      
-      renderPosCart();
-    }
-
-    function renderPosCart() {
-      if (posCart.length === 0) {
-        posCartList.innerHTML = `<div style="text-align: center; color: var(--text-muted); font-size: 0.8rem; padding: 20px 0;" id="posEmptyCartMsg">Cart is empty. Tap products above to add!</div>`;
-        posCartCount.innerText = "Items: 0";
-        posTotalText.innerText = "PKR 0";
-        return;
-      }
-
-      const msg = document.getElementById("posEmptyCartMsg");
-      if (msg) msg.style.display = 'none';
-      posCartList.innerHTML = "";
-
-      let subtotal = 0;
-      let totalQty = 0;
-
-      posCart.forEach(item => {
-        const itemCost = item.sellingPrice * item.quantity;
-        subtotal += itemCost;
-        totalQty += item.quantity;
-
-        const row = document.createElement("div");
-        row.style.display = "flex";
-        row.style.justifyContent = "space-between";
-        row.style.alignItems = "center";
-        row.style.padding = "8px 12px";
-        row.style.background = "rgba(255,255,255,0.02)";
-        row.style.borderRadius = "10px";
-        row.style.gap = "10px";
-
-        row.innerHTML = `
-          <div style="flex: 1; min-width: 0;">
-            <div style="font-size: 0.85rem; font-weight: bold; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${item.name}</div>
-            <div style="font-size: 0.75rem; color: var(--primary);">PKR ${item.sellingPrice} x ${item.quantity}</div>
-          </div>
-          <div style="display: flex; align-items: center; gap: 8px; flex-shrink: 0;">
-            <div style="display: flex; align-items: center; gap: 6px; background: rgba(255,255,255,0.05); padding: 3px 8px; border-radius: 6px;">
-              <span style="font-size: 1.1rem; font-weight:bold; cursor: pointer; padding: 0 4px;" onclick="updatePosCartQty('${item.id}', -1)">-</span>
-              <span style="font-size: 0.85rem; font-weight:bold;">${item.quantity}</span>
-              <span style="font-size: 1.1rem; font-weight:bold; cursor: pointer; padding: 0 4px;" onclick="updatePosCartQty('${item.id}', 1)">+</span>
+        <div class="install-card">
+            <div class="install-header">
+                <span class="install-logo">🎙️</span>
+                <h2>Voice<span class="gradient-text">Calc</span></h2>
+                <p class="install-tagline">Hands-Free Voice Calculator</p>
             </div>
-          </div>
-        `;
-        posCartList.appendChild(row);
-      });
+            
+            <div class="install-benefits">
+                <div class="benefit-item">
+                    <span class="benefit-icon">🎙️</span>
+                    <div class="benefit-text">
+                        <h3>Full Voice Control</h3>
+                        <p>No fingers needed. Speak, calculate, and get audio responses instantly.</p>
+                    </div>
+                </div>
+                <div class="benefit-item">
+                    <span class="benefit-icon">⚡</span>
+                    <div class="benefit-text">
+                        <h3>Offline Capability</h3>
+                        <p>Works 100% offline without requiring any internet connection.</p>
+                    </div>
+                </div>
+                <div class="benefit-item">
+                    <span class="benefit-icon">📱</span>
+                    <div class="benefit-text">
+                        <h3>Native Experience</h3>
+                        <p>Launches in full screen from your home screen just like a native app.</p>
+                    </div>
+                </div>
+            </div>
 
-      posCartCount.innerText = `Items: ${totalQty}`;
-      
-      const disc = parseFloat(posDiscount.value) || 0;
-      const finalTotal = Math.max(0, subtotal - disc);
-      posTotalText.innerText = `PKR ${finalTotal.toLocaleString()}`;
-    }
+            <!-- Dynamic Install Button -->
+            <button id="pwa-install-btn" class="install-btn">
+                <span>Install VoiceCalc Now</span>
+                <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.5" style="margin-left: 8px;"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg>
+            </button>
 
-    posDiscount.oninput = renderPosCart;
+            <!-- iOS Instruction Box (Hidden by default, shown on Safari/iOS) -->
+            <div id="ios-install-instructions" class="ios-instructions hidden">
+                <p><strong>To install on iOS:</strong> Tap the Share button <span class="ios-icon">📤</span> in Safari, scroll down and select <strong>"Add to Home Screen"</strong> <span class="ios-icon">➕</span>.</p>
+            </div>
 
-    // Checkout Button Loader State
-    function updatePosCheckoutButtonState(loading) {
-      isPosCheckoutLoading = loading;
-      if (loading) {
-        btnPosCheckout.disabled = true;
-        btnPosCheckout.style.opacity = "0.7";
-        btnPosCheckout.innerText = "Processing checkout on Laptop...";
-      } else {
-        btnPosCheckout.disabled = false;
-        btnPosCheckout.style.opacity = "1";
-        btnPosCheckout.innerText = "Complete POS Sale";
-      }
-    }
+            <button id="pwa-skip-btn" class="skip-btn">Continue in Browser</button>
+        </div>
+    </div>
 
-    // Remote Checkout Execution
-    btnPosCheckout.onclick = () => {
-      if (posCart.length === 0) {
-        alert("⚠️ Please add products to cart first!");
-        return;
-      }
-      
-      if (!selectedPosCustomer.name) {
-        alert("⚠️ Please enter Customer Details or tap 'Walk-in'!");
-        return;
-      }
+    <div class="app-container">
+        <!-- Dynamic Glow Backgrounds -->
+        <div class="ambient-glow glow-1"></div>
+        <div class="ambient-glow glow-2"></div>
 
-      if (!isLinked || !currentSessionId || !firebaseDb) {
-        alert("⚠️ POS is not linked to Laptop! Setup connection first.");
-        return;
-      }
+        <!-- Header Panel -->
+        <header class="app-header">
+            <div class="logo">
+                <span class="logo-icon">🎙️</span>
+                <h1>Voice<span class="gradient-text">Calc</span></h1>
+            </div>
+            <div class="header-actions">
+                <button id="history-btn" class="header-btn" title="Calculation History">
+                    <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                </button>
+                <button id="settings-btn" class="header-btn" title="Settings">
+                    <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 11-2.83 2.83l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 11-2.83-2.83l.06-.06a1.65 1.65 0 00.33-1.82 1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 112.83-2.83l.06.06a1.65 1.65 0 001.82.33H9a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 112.83 2.83l-.06.06a1.65 1.65 0 00-.33 1.82V9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"></path></svg>
+                </button>
+            </div>
+        </header>
 
-      updatePosCheckoutButtonState(true);
+        <!-- Main Display Panel -->
+        <main class="display-panel">
+            <!-- Active Info Banner (Mic Status or Language Indicator) -->
+            <div class="status-indicator-bar">
+                <span id="mic-status-badge" class="badge badge-inactive">Offline</span>
+                <span id="lang-status-badge" class="badge">English</span>
+            </div>
 
-      const disc = parseFloat(posDiscount.value) || 0;
-      const amtPaid = parseFloat(posAmountPaid.value) || 0;
+            <!-- Calculation Views -->
+            <div class="screens-wrapper">
+                <!-- Expression Formula Display -->
+                <div id="display-expression" class="display-expression" placeholder="Boliye: 200 + 350..."></div>
+                
+                <!-- Large Real-time Result / Running Value Display -->
+                <div id="display-result" class="display-result">0</div>
+                
+                <!-- Live Voice Speech Transcription Feed -->
+                <div class="transcription-container">
+                    <span id="transcription-text" class="transcription-text">Press Mic & Speak...</span>
+                </div>
+            </div>
+        </main>
 
-      const checkoutPayload = {
-        cart: posCart.map(item => ({
-          id: item.id,
-          name: item.name,
-          quantity: item.quantity,
-          sellingPrice: item.sellingPrice,
-          costPrice: item.costPrice
-        })),
-        selectedCustomer: selectedPosCustomer,
-        discount: disc,
-        amountPaid: amtPaid,
-        paymentMethod: posPaymentMethod,
-        saleType: posSaleType,
-        timestamp: Date.now()
-      };
+        <!-- Dynamic Equalizer / Audio Feedback Panel (Visible only when listening) -->
+        <div class="visualizer-panel" id="visualizer-panel">
+            <div class="audio-waves" id="audio-waves">
+                <span></span><span></span><span></span><span></span><span></span><span></span><span></span>
+            </div>
+        </div>
 
-      // Push checkout request to Firebase Realtime Database
-      firebaseDb.ref(`sessions/${currentSessionId}/mobile_sale_request`).set(checkoutPayload)
-        .catch(err => {
-          console.error("Checkout push error:", err);
-          alert("Error linking checkout to database!");
-          updatePosCheckoutButtonState(false);
-        });
-    };
+        <!-- Controls Section -->
+        <section class="controls-panel">
+            <!-- Floating Microphone Circle button -->
+            <div class="mic-container">
+                <button id="mic-trigger-btn" class="mic-btn" aria-label="Toggle Microphone Input">
+                    <div class="mic-glow"></div>
+                    <svg viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="currentColor" stroke-width="2.5" class="mic-icon">
+                        <path d="M12 1v10M19 8v3a7 7 0 01-14 0V8M12 18v5M8 23h8"></path>
+                        <rect x="9" y="1" width="6" height="11" rx="3" fill="currentColor"></rect>
+                    </svg>
+                </button>
+                <div class="mic-tooltip">Tap to speak or say commands</div>
+            </div>
 
-    // Populate digital receipt
-    function showMobileInvoice(result) {
-      invCustName.innerText = result.customerName;
-      invDate.innerText = new Date(result.timestamp).toLocaleDateString('en-PK', { dateStyle: 'medium' });
-      invId.innerText = "#" + result.saleId;
-      
-      invItemsBody.innerHTML = "";
-      result.items.forEach(item => {
-        const row = document.createElement("tr");
-        row.style.borderBottom = "1px dashed #eee";
-        row.innerHTML = `
-          <td style="padding: 4px 0; font-weight: 500;">${item.name}</td>
-          <td style="padding: 4px 0; text-align: center;">${item.quantity}</td>
-          <td style="padding: 4px 0; text-align: right; font-weight: 700;">${((item.sellingPrice || item.price) * item.quantity).toLocaleString()}</td>
-        `;
-        invItemsBody.appendChild(row);
-      });
+            <!-- Manual Keypad (Slides up/down or acts as immediate interactive fallback) -->
+            <div class="keypad-toggle-bar">
+                <button id="toggle-keypad-btn" class="keypad-toggle-btn">
+                    <span>Show Manual Keypad</span>
+                    <svg class="chevron" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 9l-7 7-7-7"></path></svg>
+                </button>
+            </div>
 
-      invSubtotal.innerText = `PKR ${result.subtotal.toLocaleString()}`;
-      if (result.discount > 0) {
-        invDiscountRow.style.display = "flex";
-        invDiscount.innerText = `-PKR ${result.discount.toLocaleString()}`;
-      } else {
-        invDiscountRow.style.display = "none";
-      }
+            <div class="manual-keypad collapsed" id="manual-keypad">
+                <div class="keypad-row">
+                    <button class="key-btn action-key" data-key="clear">AC</button>
+                    <button class="key-btn action-key" data-key="backspace">⌫</button>
+                    <button class="key-btn op-key" data-key="/">÷</button>
+                    <button class="key-btn op-key" data-key="*">×</button>
+                </div>
+                <div class="keypad-row">
+                    <button class="key-btn num-key" data-key="7">7</button>
+                    <button class="key-btn num-key" data-key="8">8</button>
+                    <button class="key-btn num-key" data-key="9">9</button>
+                    <button class="key-btn op-key" data-key="-">−</button>
+                </div>
+                <div class="keypad-row">
+                    <button class="key-btn num-key" data-key="4">4</button>
+                    <button class="key-btn num-key" data-key="5">5</button>
+                    <button class="key-btn num-key" data-key="6">6</button>
+                    <button class="key-btn op-key" data-key="+">+</button>
+                </div>
+                <div class="keypad-row">
+                    <button class="key-btn num-key" data-key="1">1</button>
+                    <button class="key-btn num-key" data-key="2">2</button>
+                    <button class="key-btn num-key" data-key="3">3</button>
+                    <button class="key-btn equal-key" data-key="equals">=</button>
+                </div>
+                <div class="keypad-row">
+                    <button class="key-btn num-key double" data-key="0">0</button>
+                    <button class="key-btn num-key" data-key=".">.</button>
+                </div>
+            </div>
+        </section>
 
-      invTotal.innerText = `PKR ${result.total.toLocaleString()}`;
-      invReceived.innerText = `PKR ${result.amountPaid.toLocaleString()}`;
-      
-      if (result.balanceDue >= 0) {
-        invBalanceLabel.innerText = "Baqaya (Change):";
-        invBalance.innerText = `PKR ${result.balanceDue.toLocaleString()}`;
-        invBalance.style.color = "#166534";
-      } else {
-        invBalanceLabel.innerText = "Outstanding Dues:";
-        invBalance.innerText = `PKR ${Math.abs(result.balanceDue).toLocaleString()}`;
-        invBalance.style.color = "#b45309";
-      }
+        <!-- Quick Voice Help Sheet Banner -->
+        <footer class="app-footer">
+            <button id="open-guide-btn" class="footer-link">🎙️ How to control with your voice?</button>
+        </footer>
 
-      // WhatsApp Formatting & Sharing logic
-      btnPosWhatsApp.onclick = () => {
-        const text = 
-          `*ABU ASIM PERFUMERY RECEIPT*\n` +
-          `=========================\n` +
-          `*Invoice #:* ${result.saleId}\n` +
-          `*Date:* ${new Date(result.timestamp).toLocaleDateString()}\n` +
-          `*Customer:* ${result.customerName}\n` +
-          `-------------------------\n` +
-          `*Items:*\n` +
-          result.items.map(item => `• ${item.name} x${item.quantity} - PKR ${((item.sellingPrice || item.price) * item.quantity).toLocaleString()}`).join('\n') + `\n` +
-          `-------------------------\n` +
-          `*Subtotal:* PKR ${result.subtotal.toLocaleString()}\n` +
-          (result.discount > 0 ? `*Discount:* -PKR ${result.discount.toLocaleString()}\n` : '') +
-          `*Grand Total:* PKR ${result.total.toLocaleString()}\n` +
-          `*Received:* PKR ${result.amountPaid.toLocaleString()}\n` +
-          `*${result.balanceDue >= 0 ? 'Baqaya' : 'Outstanding'}:* PKR ${Math.abs(result.balanceDue).toLocaleString()}\n` +
-          `=========================\n` +
-          `Thank you for shopping with us!\n` +
-          `_Powered by Abu Asim Digital Bills_`;
-          
-        const cleanPhone = result.customerPhone && result.customerPhone !== 'Guest' ? result.customerPhone.replace(/[^0-9]/g, '') : '';
-        const formattedPhone = cleanPhone.startsWith('0') ? '92' + cleanPhone.substring(1) : cleanPhone;
-        
-        const whatsappUrl = `https://wa.me/${formattedPhone}?text=${encodeURIComponent(text)}`;
-        window.open(whatsappUrl, '_blank');
-      };
+        <!-- Settings Slide-over / Modal Popup -->
+        <div class="overlay hidden" id="settings-overlay">
+            <div class="modal-card">
+                <div class="modal-header">
+                    <h2>Voice Settings</h2>
+                    <button class="close-btn" id="close-settings-btn">&times;</button>
+                </div>
+                <div class="modal-body">
+                    <div class="setting-item">
+                        <div class="setting-info">
+                            <label for="language-select">Voice Recognition Language</label>
+                            <span class="setting-desc">Choose language for voice parsing</span>
+                        </div>
+                        <select id="language-select" class="custom-select">
+                            <option value="en-US">English (US)</option>
+                            <option value="ur-PK">Urdu (Pakistan) / Hinglish</option>
+                            <option value="hi-IN">Hindi (India)</option>
+                        </select>
+                    </div>
 
-      invoiceModal.classList.add("active");
-    }
+                    <div class="setting-item">
+                        <div class="setting-info">
+                            <label for="voice-tts-toggle">Speak Aloud Answers</label>
+                            <span class="setting-desc">Read out calculated values automatically</span>
+                        </div>
+                        <div class="toggle-switch">
+                            <input type="checkbox" id="voice-tts-toggle" checked>
+                            <label for="voice-tts-toggle" class="switch-slider"></label>
+                        </div>
+                    </div>
 
-    // New Sale (Reset Cart)
-    btnPosCloseInvoice.onclick = () => {
-      invoiceModal.classList.remove("active");
-      posCart = [];
-      posDiscount.value = "0";
-      posAmountPaid.value = "";
-      posCustName.value = "";
-      posCustPhone.value = "";
-      posCustPhone.readOnly = false;
-      posAmountPaid.style.display = "block";
-      posAmountPaidLabel.style.display = "block";
-      selectedPosCustomer = { name: "", phone: "", id: "" };
-      posPaymentMethod = "Cash";
-      posSaleType = "Physical";
-      
-      btnPosPayCash.click();
-      btnPosTypePhysical.click();
-      
-      renderPosCart();
-    };
+                    <div class="setting-item">
+                        <div class="setting-info">
+                            <label for="continuous-listening-toggle">Continuous Listening</label>
+                            <span class="setting-desc">Keep mic open during long runs</span>
+                        </div>
+                        <div class="toggle-switch">
+                            <input type="checkbox" id="continuous-listening-toggle" checked>
+                            <label for="continuous-listening-toggle" class="switch-slider"></label>
+                        </div>
+                    </div>
 
-    // --- Custom Firebase Configuration Modal Logic ---
-    const configModal = document.getElementById("configModal");
-    const btnOpenConfig = document.getElementById("btnOpenConfig");
-    const btnSaveConfig = document.getElementById("btnSaveConfig");
-    const btnCancelConfig = document.getElementById("btnCancelConfig");
-    const fbDbUrl = document.getElementById("fbDbUrl");
-    const fbApiKey = document.getElementById("fbApiKey");
-    const fbProjId = document.getElementById("fbProjId");
+                    <div class="setting-item">
+                        <div class="setting-info">
+                            <label for="haptic-audio-toggle">Sound & Click Effects</label>
+                            <span class="setting-desc">Play feedback tones when parsing sounds</span>
+                        </div>
+                        <div class="toggle-switch">
+                            <input type="checkbox" id="haptic-audio-toggle" checked>
+                            <label for="haptic-audio-toggle" class="switch-slider"></label>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
 
-    if (btnOpenConfig) {
-      btnOpenConfig.addEventListener("click", () => {
-        // Pre-populate input values from current database or settings
-        const savedConfig = localStorage.getItem("fb_config");
-        if (savedConfig) {
-          try {
-            const config = JSON.parse(savedConfig);
-            fbDbUrl.value = config.databaseURL || "";
-            fbApiKey.value = config.apiKey || "";
-            fbProjId.value = config.projectId || "";
-          } catch(e){}
-        } else {
-          // Defaults if no config is set
-          fbDbUrl.value = "";
-          fbApiKey.value = "";
-          fbProjId.value = "";
+        <!-- History Drawer -->
+        <div class="overlay hidden" id="history-overlay">
+            <div class="modal-card history-card">
+                <div class="modal-header">
+                    <h2>Calculation History</h2>
+                    <button class="close-btn" id="close-history-btn">&times;</button>
+                </div>
+                <div class="modal-body history-body" id="history-container">
+                    <!-- History calculations injected here -->
+                    <div class="empty-state">
+                        <p>No calculations recorded yet.</p>
+                        <span>Your history will show up here as you make calculations.</span>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button id="clear-history-btn" class="danger-btn">Clear All History</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Voice Instructions Help Modal -->
+        <div class="overlay hidden" id="guide-overlay">
+            <div class="modal-card guide-card">
+                <div class="modal-header">
+                    <h2>🎙️ Speaking Guide</h2>
+                    <button class="close-btn" id="close-guide-btn-top">&times;</button>
+                </div>
+                <div class="modal-body scrollable">
+                    <h3>How to use Voice Commands</h3>
+                    <p>Simply tap the large glowing Microphone button at the bottom and speak directly! For example:</p>
+
+                    <div class="example-box">
+                        <span class="badge badge-accent">English Example</span>
+                        <div class="phrase">"200 plus 350 plus 1200 minus 300 equal"</div>
+                        <div class="parsed-preview">Calculates: <code>200 + 350 + 1200 - 300 = 1450</code></div>
+                    </div>
+
+                    <div class="example-box">
+                        <span class="badge badge-accent">Urdu/Hindi Example</span>
+                        <div class="phrase">"nau sau jamah do sau nifi pachas barabar"</div>
+                        <div class="parsed-preview">Calculates: <code>900 + 200 - 50 = 1050</code></div>
+                    </div>
+
+                    <h3>Supported Spoken Keywords</h3>
+                    <table class="voice-table">
+                        <thead>
+                            <tr>
+                                <th>Math Operation</th>
+                                <th>English Keywords</th>
+                                <th>Urdu/Hindi Keywords</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td><strong>Add (+)</strong></td>
+                                <td>"plus", "add", "and"</td>
+                                <td>"jamah", "jama", "جمع"</td>
+                            </tr>
+                            <tr>
+                                <td><strong>Subtract (-)</strong></td>
+                                <td>"minus", "subtract"</td>
+                                <td>"nifi", "nifee", "manfi", "tafreeq"</td>
+                            </tr>
+                            <tr>
+                                <td><strong>Multiply (*)</strong></td>
+                                <td>"times", "into", "multiply", "multiplied by"</td>
+                                <td>"zarb", " ضرب"</td>
+                            </tr>
+                            <tr>
+                                <td><strong>Divide (/)</strong></td>
+                                <td>"divide", "divided by", "over"</td>
+                                <td>"takseem", "تقسیم"</td>
+                            </tr>
+                            <tr>
+                                <td><strong>Calculate (=)</strong></td>
+                                <td>"equal", "equals", "equal to"</td>
+                                <td>"barabar", "برابر"</td>
+                            </tr>
+                            <tr>
+                                <td><strong>Clear (AC)</strong></td>
+                                <td>"clear", "all clear", "reset"</td>
+                                <td>"saaf karein", "khatam karein"</td>
+                            </tr>
+                        </tbody>
+                    </table>
+
+                    <div class="guide-note">
+                        <strong>💡 Pro-Tip:</strong> The app will automatically show a live preview of what you are saying at the bottom, so you can see if it parses your numbers correctly as you speak!
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button class="success-btn" id="close-guide-btn-bottom">Got it, Let's Start!</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Core App Logic -->
+    <script src="app.js"></script>
+    <script>
+        // Register PWA Service Worker for offline capabilities
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('sw.js')
+                    .then(registration => console.log('ServiceWorker registered with scope:', registration.scope))
+                    .catch(error => console.error('ServiceWorker registration failed:', error));
+            });
         }
-        configModal.classList.add("active");
-      });
-    }
-
-    if (btnCancelConfig) {
-      btnCancelConfig.addEventListener("click", () => {
-        // Cancel custom configuration - clear settings and reload to go back to Default Demo Server
-        const confirmDemo = confirm("Use default public demo database server?");
-        if (confirmDemo) {
-          localStorage.removeItem("fb_config");
-          configModal.classList.remove("active");
-          alert("Resetting database to Demo. The app will now reload.");
-          window.location.reload();
-        } else {
-          configModal.classList.remove("active");
-        }
-      });
-    }
-
-    if (btnSaveConfig) {
-      btnSaveConfig.addEventListener("click", () => {
-        const dbUrl = fbDbUrl.value.trim();
-        const apiKey = fbApiKey.value.trim();
-        const projId = fbProjId.value.trim();
-
-        if (!dbUrl || !apiKey || !projId) {
-          alert("All fields are required to setup private Firebase!");
-          return;
-        }
-
-        // Build a complete Firebase project configuration object
-        const customConfig = {
-          apiKey: apiKey,
-          authDomain: `${projId}.firebaseapp.com`,
-          databaseURL: dbUrl,
-          projectId: projId,
-          storageBucket: `${projId}.firebasestorage.app`,
-          messagingSenderId: "1234567890", // placeholder
-          appId: "1:1234567890:web:abcdef123456" // placeholder
-        };
-
-        localStorage.setItem("fb_config", JSON.stringify(customConfig));
-        configModal.classList.remove("active");
-        alert("Custom Firebase configuration saved! Reloading to link new database.");
-        window.location.reload();
-      });
-    }
-
-    // --- Onload Init ---
-    window.addEventListener('load', () => {
-      initFirebase();
-    });
-  </script>
+    </script>
 </body>
 </html>

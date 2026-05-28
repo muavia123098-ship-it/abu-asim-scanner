@@ -1,23 +1,25 @@
 {
-  "name": "Abu Asim Scanner",
-  "short_name": "AA Scanner",
-  "start_url": "./index.html",
+  "name": "VoiceCalc - Hands-Free Voice Calculator",
+  "short_name": "VoiceCalc",
+  "description": "Hands-Free Mobile Voice Calculator for English, Urdu, and Hindi languages.",
+  "start_url": "index.html",
   "display": "standalone",
-  "background_color": "#09090b",
-  "theme_color": "#d4af37",
-  "orientation": "portrait",
+  "background_color": "#07080b",
+  "theme_color": "#07080b",
+  "orientation": "portrait-primary",
+  "categories": ["utilities", "productivity"],
   "icons": [
     {
-      "src": "./assets/logo.png",
-      "sizes": "512x512",
+      "src": "icon-192.png",
+      "sizes": "192x192",
       "type": "image/png",
       "purpose": "any maskable"
     },
     {
-      "src": "./assets/logo.png",
-      "sizes": "192x192",
+      "src": "icon-512.png",
+      "sizes": "512x512",
       "type": "image/png",
-      "purpose": "any"
+      "purpose": "any maskable"
     }
   ]
 }
