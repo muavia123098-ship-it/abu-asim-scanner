@@ -1,12 +1,12 @@
 /* ==========================================================================
    Karachi Green Line BRT - Smart QR Ticket & Reusable Card System
-   Low-Quality Tablet Camera Scanner Optimizations & High-Speed Recognition
+   Features: Mobile Auto-Zoom Fix, Clean PIN Unlock, Custom Admin PIN Changer
    ========================================================================== */
 
 document.addEventListener('DOMContentLoaded', () => {
 
     // ----------------------------------------------------------------------
-    // 1. PWA & AUDIO UNLOCK FOR MOBILE/TABLET BROWSERS
+    // 1. PWA & AUDIO UNLOCK
     // ----------------------------------------------------------------------
     let deferredPrompt = null;
     const btnInstallPwa = document.getElementById('btn-install-pwa');
@@ -45,7 +45,7 @@ document.addEventListener('DOMContentLoaded', () => {
     window.addEventListener('click', () => getAudioContext(), { once: true });
 
     // ----------------------------------------------------------------------
-    // 2. FIREBASE CONFIGURATION & CLOUD INITIALIZATION
+    // 2. FIREBASE CONFIGURATION & DUAL CLOUD SYNC ENGINE
     // ----------------------------------------------------------------------
     const firebaseConfig = {
         apiKey: "AIzaSyAVuxdQ-k8pZyy2PnoTwBG3XEpAt2-cLsc",
@@ -56,6 +56,8 @@ document.addEventListener('DOMContentLoaded', () => {
         appId: "1:639566437448:web:ed646713ae76f0ff3b0c7d"
     };
 
+    const PUBLIC_CLOUD_ENDPOINT = "https://greenline-system-default-rtdb.firebaseio.com/cards.json";
+
     let db = null;
     let isCloudOnline = false;
 
@@ -64,26 +66,26 @@ document.addEventListener('DOMContentLoaded', () => {
             firebase.initializeApp(firebaseConfig);
             db = firebase.firestore();
             isCloudOnline = true;
-            console.log("🟢 Firebase Real-Time Cloud Firestore Connected!");
+            console.log("🟢 Firebase App Initialized!");
         } catch (e) {
-            console.error("Firebase init fallback:", e);
+            console.warn("Firebase init info:", e);
         }
     }
 
     const FARE_PER_SCAN = 25;
-    const ADMIN_PIN_DEFAULT = "1234";
 
     let state = {
         cards: [],
         revenue: 0,
-        gateMode: 'ENTRY', // 'ENTRY' or 'EXIT'
-        activeView: 'GUARD', // 'GUARD' or 'ADMIN'
+        gateMode: 'ENTRY',
+        activeView: 'GUARD',
         activeAdminTab: 'dash',
         scannerActive: false,
         rechargeScannerActive: false,
         lastScanTime: 0,
         activeCardId: null,
-        rechargeTargetCardId: null
+        rechargeTargetCardId: null,
+        adminPin: localStorage.getItem('gl_admin_pin') || '1234'
     };
 
     let html5QrCodeGuard = null;
@@ -93,26 +95,66 @@ document.addEventListener('DOMContentLoaded', () => {
         loadLocalStorageBackup();
 
         if (isCloudOnline && db) {
-            db.collection("cards").onSnapshot((snapshot) => {
-                const cloudCards = [];
-                let calcRevenue = 0;
+            try {
+                db.collection("cards").onSnapshot((snapshot) => {
+                    const cloudCards = [];
+                    let calcRevenue = 0;
 
-                snapshot.forEach((doc) => {
-                    const data = doc.data();
-                    cloudCards.push(data);
-                    if (data.initialBalance) calcRevenue += data.initialBalance;
+                    snapshot.forEach((doc) => {
+                        const data = doc.data();
+                        cloudCards.push(data);
+                        if (typeof data.initialBalance === 'number') calcRevenue += data.initialBalance;
+                    });
+
+                    if (cloudCards.length > 0) {
+                        mergeAndRenderCards(cloudCards);
+                    }
+                }, (error) => {
+                    console.warn("Firestore notice, loading REST fallback:", error);
                 });
-
-                if (cloudCards.length > 0) {
-                    state.cards = cloudCards;
-                    state.revenue = calcRevenue;
-                    saveLocalStorageBackup();
-                    renderApp();
-                }
-            }, (error) => {
-                console.warn("Firebase notice (using local storage):", error);
-            });
+            } catch (err) {
+                console.warn("Firestore error:", err);
+            }
         }
+
+        startCloudRestPoller();
+    }
+
+    function startCloudRestPoller() {
+        fetchCloudRestData();
+        setInterval(fetchCloudRestData, 2500);
+    }
+
+    function fetchCloudRestData() {
+        fetch(PUBLIC_CLOUD_ENDPOINT)
+            .then(res => res.json())
+            .then(data => {
+                if (data && typeof data === 'object') {
+                    const cloudCards = Object.values(data);
+                    if (cloudCards.length > 0) {
+                        mergeAndRenderCards(cloudCards);
+                    }
+                }
+            })
+            .catch(err => console.log("Cloud REST fetch info:", err));
+    }
+
+    function mergeAndRenderCards(cloudCards) {
+        const map = new Map();
+        state.cards.forEach(c => map.set(c.id, c));
+        cloudCards.forEach(c => map.set(c.id, c));
+
+        state.cards = Array.from(map.values());
+        
+        let calcRev = 0;
+        state.cards.forEach(c => {
+            const val = typeof c.initialBalance === 'number' ? c.initialBalance : c.balance;
+            calcRev += (typeof val === 'number' ? val : 0);
+        });
+        state.revenue = calcRev;
+
+        saveLocalStorageBackup();
+        renderApp();
     }
 
     function loadLocalStorageBackup() {
@@ -138,11 +180,19 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function syncCardToCloud(card) {
         saveLocalStorageBackup();
+        
         if (isCloudOnline && db) {
             db.collection("cards").doc(card.id).set(card, { merge: true })
-                .then(() => console.log(`Cloud Synced: ${card.id}`))
-                .catch(err => console.warn("Cloud write info:", err));
+                .then(() => console.log(`Firestore Synced: ${card.id}`))
+                .catch(err => console.warn("Firestore info:", err));
         }
+
+        fetch(`https://greenline-system-default-rtdb.firebaseio.com/cards/${card.id}.json`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(card)
+        }).then(() => console.log(`REST Cloud Synced: ${card.id}`))
+        .catch(err => console.log("REST Sync Error:", err));
     }
 
     // ----------------------------------------------------------------------
@@ -211,7 +261,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // ----------------------------------------------------------------------
-    // 4. HIGH-CONTRAST QR CODE GENERATOR FOR LOW-RES TABLET CAMERAS
+    // 4. QR CODE GENERATOR UTILITY
     // ----------------------------------------------------------------------
     function generateQRCode(elementId, textData, size = 100) {
         const container = document.getElementById(elementId);
@@ -233,14 +283,13 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // ----------------------------------------------------------------------
-    // 5. GUARD SCANNER & GATE SCANNING CORE LOGIC
+    // 5. GUARD SCANNER LOGIC
     // ----------------------------------------------------------------------
     function processGuardScan(rawText) {
         if (!rawText) return;
 
         const now = Date.now();
-        // 1.2 Second debounce lock
-        if (now - state.lastScanTime < 1200) return;
+        if (now - state.lastScanTime < 1000) return;
         state.lastScanTime = now;
 
         const cardId = rawText.trim();
@@ -249,10 +298,12 @@ document.addEventListener('DOMContentLoaded', () => {
         const card = state.cards.find(c => c.id.toUpperCase() === cardId.toUpperCase());
 
         if (!card) {
-            triggerSignalResult(false, 'INVALID / TAMPERED QR', `QR Code "${cardId}" System DB Mein Register Nahi Hai!`);
-            addScanHistoryLog(cardId, 'Unknown', 'DENIED - FAKE/UNREGISTERED', 0);
+            triggerSignalResult(false, 'INVALID / UNREGISTERED QR', `QR Code "${cardId}" System DB Mein Register Nahi Hai!`);
+            addScanHistoryLog(cardId, 'Unknown', 'DENIED - UNREGISTERED', 0);
             return;
         }
+
+        const currentBalance = typeof card.balance === 'number' ? card.balance : 0;
 
         if (state.gateMode === 'ENTRY') {
             if (card.status === 'IN_TRANSIT') {
@@ -261,14 +312,14 @@ document.addEventListener('DOMContentLoaded', () => {
                 return;
             }
 
-            if (card.balance < FARE_PER_SCAN) {
-                triggerSignalResult(false, 'INSUFFICIENT BALANCE 🔴', `${card.name} Ka Balance Kam Hai! Current: Rs. ${card.balance}`);
-                addScanHistoryLog(card.id, card.name, 'DENIED - LOW BALANCE', card.balance);
+            if (currentBalance < FARE_PER_SCAN) {
+                triggerSignalResult(false, 'INSUFFICIENT BALANCE 🔴', `${card.name} Ka Balance Kam Hai! Current: Rs. ${currentBalance}`);
+                addScanHistoryLog(card.id, card.name, 'DENIED - LOW BALANCE', currentBalance);
                 return;
             }
 
             // SUCCESS ENTRY 🟢
-            card.balance -= FARE_PER_SCAN;
+            card.balance = currentBalance - FARE_PER_SCAN;
             card.status = 'IN_TRANSIT';
             
             syncCardToCloud(card);
@@ -284,14 +335,14 @@ document.addEventListener('DOMContentLoaded', () => {
                 return;
             }
 
-            if (card.balance < FARE_PER_SCAN) {
-                triggerSignalResult(false, 'INSUFFICIENT FARE', `${card.name} Ka Remaining Exit Fare Kam Hai! Balance: Rs. ${card.balance}`);
-                addScanHistoryLog(card.id, card.name, 'DENIED - LOW EXIT BALANCE', card.balance);
+            if (currentBalance < FARE_PER_SCAN) {
+                triggerSignalResult(false, 'INSUFFICIENT FARE', `${card.name} Ka Remaining Exit Fare Kam Hai! Balance: Rs. ${currentBalance}`);
+                addScanHistoryLog(card.id, card.name, 'DENIED - LOW EXIT BALANCE', currentBalance);
                 return;
             }
 
             // SUCCESS EXIT 🟢
-            card.balance -= FARE_PER_SCAN;
+            card.balance = currentBalance - FARE_PER_SCAN;
             card.status = 'COMPLETED';
 
             syncCardToCloud(card);
@@ -358,13 +409,12 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // ----------------------------------------------------------------------
-    // 6. HIGH-SPEED TABLET CAMERA SCANNER ENGINE (30 FPS & BARCODE DETECTOR)
+    // 6. HIGH-SPEED CAMERA SCANNER ENGINE
     // ----------------------------------------------------------------------
     function startGuardCameraScanner() {
         if (typeof Html5Qrcode === 'undefined') return;
 
         if (!html5QrCodeGuard) {
-            // Enable native BarcodeDetector API for 10x faster scanning on tablets
             html5QrCodeGuard = new Html5Qrcode("reader", {
                 experimentalFeatures: {
                     useBarCodeDetectorIfSupported: true
@@ -372,9 +422,8 @@ document.addEventListener('DOMContentLoaded', () => {
             });
         }
 
-        // High frequency scanning & dynamic viewfinder for low-res tablet cameras
         const config = {
-            fps: 30,
+            fps: 25,
             qrbox: (viewfinderWidth, viewfinderHeight) => {
                 const minEdge = Math.min(viewfinderWidth, viewfinderHeight);
                 return {
@@ -395,8 +444,8 @@ document.addEventListener('DOMContentLoaded', () => {
             document.getElementById('btn-start-camera').classList.add('hidden');
             document.getElementById('btn-stop-camera').classList.remove('hidden');
         }).catch(err => {
-            alert('Tablet Camera Settings: Browser mein camera permission allow karein.');
-            console.log('Tablet Camera Error:', err);
+            alert('Camera Settings: Browser mein camera permission allow karein.');
+            console.log('Camera Error:', err);
         });
     }
 
@@ -422,7 +471,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         const config = {
-            fps: 30,
+            fps: 25,
             qrbox: (w, h) => {
                 const edge = Math.min(w, h);
                 return { width: Math.floor(edge * 0.85), height: Math.floor(edge * 0.85) };
@@ -458,6 +507,11 @@ document.addEventListener('DOMContentLoaded', () => {
     // 7. DEDICATED RECHARGE TOOL LOGIC
     // ----------------------------------------------------------------------
     function fetchCardForRecharge(cardId) {
+        if (!cardId) {
+            document.getElementById('recharge-card-result').classList.add('hidden');
+            return;
+        }
+
         const card = state.cards.find(c => c.id.toUpperCase() === cardId.trim().toUpperCase());
         const resultContainer = document.getElementById('recharge-card-result');
 
@@ -469,10 +523,12 @@ document.addEventListener('DOMContentLoaded', () => {
 
         state.rechargeTargetCardId = card.id;
 
+        const realBal = typeof card.balance === 'number' ? card.balance : 0;
+
         document.getElementById('rc-name').textContent = card.name;
         document.getElementById('rc-id').textContent = card.id;
         document.getElementById('rc-phone').textContent = card.phone;
-        document.getElementById('rc-balance').textContent = `Rs. ${card.balance}`;
+        document.getElementById('rc-balance').textContent = `Rs. ${realBal}`;
 
         resultContainer.classList.remove('hidden');
     }
@@ -490,7 +546,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
         const card = state.cards.find(c => c.id === state.rechargeTargetCardId);
         if (card) {
-            card.balance += amount;
+            const currentBal = typeof card.balance === 'number' ? card.balance : 0;
+            card.balance = currentBal + amount;
             card.initialBalance = (card.initialBalance || 0) + amount;
             
             syncCardToCloud(card);
@@ -507,7 +564,11 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     document.getElementById('recharge-select-card').addEventListener('change', (e) => {
-        if (e.target.value) fetchCardForRecharge(e.target.value);
+        if (e.target.value) {
+            fetchCardForRecharge(e.target.value);
+        } else {
+            document.getElementById('recharge-card-result').classList.add('hidden');
+        }
     });
 
     // ----------------------------------------------------------------------
@@ -519,7 +580,8 @@ document.addEventListener('DOMContentLoaded', () => {
         
         let totalRevenue = 0;
         state.cards.forEach(c => {
-            totalRevenue += (c.initialBalance || c.balance || 0);
+            const val = typeof c.initialBalance === 'number' ? c.initialBalance : c.balance;
+            totalRevenue += (typeof val === 'number' ? val : 0);
         });
         document.getElementById('stat-total-revenue').textContent = `Rs. ${totalRevenue}`;
         
@@ -529,28 +591,46 @@ document.addEventListener('DOMContentLoaded', () => {
         // Recharge Select Dropdown
         const rechargeSelect = document.getElementById('recharge-select-card');
         if (rechargeSelect) {
+            const selectedVal = rechargeSelect.value;
             rechargeSelect.innerHTML = '<option value="">-- Card Select Karein --</option>' +
-                state.cards.map(c => `<option value="${c.id}">${c.name} (${c.id}) - Balance: Rs. ${c.balance}</option>`).join('');
+                state.cards.map(c => {
+                    const bal = typeof c.balance === 'number' ? c.balance : 0;
+                    return `<option value="${c.id}">${c.name} (${c.id}) - Balance: Rs. ${bal}</option>`;
+                }).join('');
+            
+            if (selectedVal) rechargeSelect.value = selectedVal;
         }
 
-        // Render Cards Gallery with 140px High-Contrast QR for Tablet Cameras
+        // Update active target recharge card balance if currently visible
+        if (state.rechargeTargetCardId && !document.getElementById('recharge-card-result').classList.contains('hidden')) {
+            const activeRechargeCard = state.cards.find(c => c.id === state.rechargeTargetCardId);
+            if (activeRechargeCard) {
+                const realBal = typeof activeRechargeCard.balance === 'number' ? activeRechargeCard.balance : 0;
+                document.getElementById('rc-balance').textContent = `Rs. ${realBal}`;
+            }
+        }
+
+        // Render Cards Gallery
         const galleryGrid = document.getElementById('qr-gallery-grid');
         if (galleryGrid) {
             if (state.cards.length === 0) {
                 galleryGrid.innerHTML = `<div style="grid-column: 1/-1; text-align:center; padding:30px; color:#8e9bb0;">Abhi tak koi card issue nahi hua. "Issue New Card" tab par ja kar naya card banayein!</div>`;
             } else {
-                galleryGrid.innerHTML = state.cards.map(c => `
-                    <div class="gallery-card-item">
-                        <div class="gallery-qr-wrapper" id="gallery-qr-${c.id}"></div>
-                        <div class="gallery-card-details">
-                            <h4>${c.name}</h4>
-                            <p>ID: <strong>${c.id}</strong></p>
-                            <span class="bal-badge" style="color: ${c.balance >= FARE_PER_SCAN ? '#00e676' : '#ff1744'};">
-                                Balance: Rs. ${c.balance}
-                            </span>
+                galleryGrid.innerHTML = state.cards.map(c => {
+                    const bal = typeof c.balance === 'number' ? c.balance : 0;
+                    return `
+                        <div class="gallery-card-item">
+                            <div class="gallery-qr-wrapper" id="gallery-qr-${c.id}"></div>
+                            <div class="gallery-card-details">
+                                <h4>${c.name}</h4>
+                                <p>ID: <strong>${c.id}</strong></p>
+                                <span class="bal-badge" style="color: ${bal >= FARE_PER_SCAN ? '#00e676' : '#ff1744'};">
+                                    Balance: Rs. ${bal}
+                                </span>
+                            </div>
                         </div>
-                    </div>
-                `).join('');
+                    `;
+                }).join('');
 
                 state.cards.forEach(c => {
                     generateQRCode(`gallery-qr-${c.id}`, c.id, 140);
@@ -564,24 +644,27 @@ document.addEventListener('DOMContentLoaded', () => {
             if (state.cards.length === 0) {
                 tbody.innerHTML = `<tr><td colspan="6" style="text-align:center; color:#8e9bb0; padding:20px;">System DB Mein Koi Record Nahi Hai. Pehla card banayein!</td></tr>`;
             } else {
-                tbody.innerHTML = state.cards.map(c => `
-                    <tr>
-                        <td><strong>${c.id}</strong></td>
-                        <td>${c.name}</td>
-                        <td>${c.phone}</td>
-                        <td><strong style="color:#00e676;">Rs. ${c.balance}</strong></td>
-                        <td>
-                            <span class="status-badge ${c.status === 'IN_TRANSIT' ? 'status-transit' : 'status-active'}">
-                                ${c.status === 'IN_TRANSIT' ? 'IN TRANSIT 🚌' : 'COMPLETED ✅'}
-                            </span>
-                        </td>
-                        <td>
-                            <button class="btn btn-outline btn-view-card" data-card-id="${c.id}" style="padding:4px 10px; font-size:0.75rem;">
-                                <i class="fa-solid fa-qrcode"></i> View Card
-                            </button>
-                        </td>
-                    </tr>
-                `).join('');
+                tbody.innerHTML = state.cards.map(c => {
+                    const bal = typeof c.balance === 'number' ? c.balance : 0;
+                    return `
+                        <tr>
+                            <td><strong>${c.id}</strong></td>
+                            <td>${c.name}</td>
+                            <td>${c.phone}</td>
+                            <td><strong style="color:#00e676;">Rs. ${bal}</strong></td>
+                            <td>
+                                <span class="status-badge ${c.status === 'IN_TRANSIT' ? 'status-transit' : 'status-active'}">
+                                    ${c.status === 'IN_TRANSIT' ? 'IN TRANSIT 🚌' : 'COMPLETED ✅'}
+                                </span>
+                            </td>
+                            <td>
+                                <button class="btn btn-outline btn-view-card" data-card-id="${c.id}" style="padding:4px 10px; font-size:0.75rem;">
+                                    <i class="fa-solid fa-qrcode"></i> View Card
+                                </button>
+                            </td>
+                        </tr>
+                    `;
+                }).join('');
 
                 tbody.querySelectorAll('.btn-view-card').forEach(btn => {
                     btn.addEventListener('click', () => {
@@ -593,29 +676,42 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         }
 
-        // Render Default Preview Card
-        if (state.cards.length > 0) {
-            const activeId = state.activeCardId || state.cards[state.cards.length - 1].id;
-            displayCardPreview(activeId);
+        // Render PVC Card Preview ONLY IF a card is actively selected / freshly issued
+        if (state.activeCardId) {
+            displayCardPreview(state.activeCardId);
         } else {
-            document.getElementById('preview-user-name').textContent = 'No Card Created';
-            document.getElementById('preview-card-id').textContent = 'GL-CARD-XXXX';
-            document.getElementById('preview-card-phone').textContent = '03XX-XXXXXXX';
-            document.getElementById('preview-card-balance').textContent = 'Rs. 0';
-            document.getElementById('preview-qr-code').innerHTML = '';
+            renderPlaceholderCardPreview();
+        }
+    }
+
+    function renderPlaceholderCardPreview() {
+        document.getElementById('preview-user-name').textContent = 'Naya Card Select/Issue Karein';
+        document.getElementById('preview-card-id').textContent = 'GL-CARD-XXXX';
+        document.getElementById('preview-card-phone').textContent = '03XX-XXXXXXX';
+        document.getElementById('preview-card-balance').textContent = 'Rs. 0';
+        document.getElementById('preview-card-status').textContent = 'NEW PASS';
+        document.getElementById('preview-card-status').className = 'status-badge status-active';
+        
+        const qrBox = document.getElementById('preview-qr-code');
+        if (qrBox) {
+            qrBox.innerHTML = `<div style="width:95px; height:95px; display:flex; justify-content:center; align-items:center; color:#aaa; font-size:0.7rem; text-align:center;">QR PREVIEW</div>`;
         }
     }
 
     function displayCardPreview(cardId) {
         const card = state.cards.find(c => c.id === cardId);
-        if (!card) return;
+        if (!card) {
+            renderPlaceholderCardPreview();
+            return;
+        }
 
         state.activeCardId = cardId;
+        const bal = typeof card.balance === 'number' ? card.balance : 0;
 
         document.getElementById('preview-user-name').textContent = card.name;
         document.getElementById('preview-card-id').textContent = card.id;
         document.getElementById('preview-card-phone').textContent = card.phone;
-        document.getElementById('preview-card-balance').textContent = `Rs. ${card.balance}`;
+        document.getElementById('preview-card-balance').textContent = `Rs. ${bal}`;
         
         const statusEl = document.getElementById('preview-card-status');
         if (card.status === 'IN_TRANSIT') {
@@ -636,46 +732,96 @@ document.addEventListener('DOMContentLoaded', () => {
             dash: document.getElementById('nav-dash'),
             issue: document.getElementById('nav-issue'),
             recharge: document.getElementById('nav-recharge'),
-            gallery: document.getElementById('nav-gallery')
+            gallery: document.getElementById('nav-gallery'),
+            settings: document.getElementById('nav-settings')
         };
 
         const pages = {
             dash: document.getElementById('tab-dash-content'),
             issue: document.getElementById('tab-issue-content'),
             recharge: document.getElementById('tab-recharge-content'),
-            gallery: document.getElementById('tab-gallery-content')
+            gallery: document.getElementById('tab-gallery-content'),
+            settings: document.getElementById('tab-settings-content')
         };
 
         Object.keys(navBtns).forEach(k => {
-            if (k === tabName) {
+            if (k === tabName && navBtns[k] && pages[k]) {
                 navBtns[k].classList.add('active');
                 pages[k].classList.remove('hidden');
-            } else {
+            } else if (navBtns[k] && pages[k]) {
                 navBtns[k].classList.remove('active');
                 pages[k].classList.add('hidden');
             }
         });
 
-        if (tabName !== 'recharge') {
+        if (tabName === 'issue') {
+            if (!state.activeCardId) renderPlaceholderCardPreview();
+        } else if (tabName === 'recharge') {
+            state.rechargeTargetCardId = null;
+            document.getElementById('recharge-card-result').classList.add('hidden');
+            const selectEl = document.getElementById('recharge-select-card');
+            if (selectEl) selectEl.value = "";
+            const searchInput = document.getElementById('recharge-search-id');
+            if (searchInput) searchInput.value = "";
+        } else {
             stopRechargeCameraScanner();
         }
     }
 
-    document.getElementById('nav-dash').addEventListener('click', () => switchAdminTab('dash'));
-    document.getElementById('nav-issue').addEventListener('click', () => switchAdminTab('issue'));
-    document.getElementById('nav-recharge').addEventListener('click', () => switchAdminTab('recharge'));
-    document.getElementById('nav-gallery').addEventListener('click', () => switchAdminTab('gallery'));
+    if (document.getElementById('nav-dash')) document.getElementById('nav-dash').addEventListener('click', () => switchAdminTab('dash'));
+    if (document.getElementById('nav-issue')) document.getElementById('nav-issue').addEventListener('click', () => switchAdminTab('issue'));
+    if (document.getElementById('nav-recharge')) document.getElementById('nav-recharge').addEventListener('click', () => switchAdminTab('recharge'));
+    if (document.getElementById('nav-gallery')) document.getElementById('nav-gallery').addEventListener('click', () => switchAdminTab('gallery'));
+    if (document.getElementById('nav-settings')) document.getElementById('nav-settings').addEventListener('click', () => switchAdminTab('settings'));
 
-    // Print Card
+    // ----------------------------------------------------------------------
+    // 9. CHANGE SECURITY PIN FORM HANDLER
+    // ----------------------------------------------------------------------
+    const formChangePin = document.getElementById('form-change-pin');
+    if (formChangePin) {
+        formChangePin.addEventListener('submit', (e) => {
+            e.preventDefault();
+            const oldPin = document.getElementById('pin-old').value.trim();
+            const newPin = document.getElementById('pin-new').value.trim();
+            const confirmPin = document.getElementById('pin-confirm').value.trim();
+
+            if (oldPin !== state.adminPin) {
+                alert('❌ Purana PIN Code Galat Hai!');
+                return;
+            }
+
+            if (newPin.length < 4) {
+                alert('❌ Naya PIN kam se kam 4 digits ka hona chahiye!');
+                return;
+            }
+
+            if (newPin !== confirmPin) {
+                alert('❌ Naya PIN aur Confirm PIN aapas mein match nahi kar rahe!');
+                return;
+            }
+
+            // Save new PIN
+            state.adminPin = newPin;
+            localStorage.setItem('gl_admin_pin', newPin);
+            playGrantedSound();
+            alert(`✅ SECURITY PIN SUCCESSFUL CHANGED!\nAapka naya Admin PIN ab: ${newPin}`);
+            formChangePin.reset();
+        });
+    }
+
+    // ----------------------------------------------------------------------
+    // 10. PRINT CARD & GENERAL EVENT LISTENERS
+    // ----------------------------------------------------------------------
     document.getElementById('btn-print-card').addEventListener('click', () => {
-        const activeId = state.activeCardId || (state.cards.length > 0 ? state.cards[0].id : null);
-        if (!activeId) {
-            alert('Pehle Naya Card Issue Karein.');
+        if (!state.activeCardId) {
+            alert('Pehle Naya Card Issue Karein ya Table se View Card Select Karein.');
             return;
         }
 
-        const card = state.cards.find(c => c.id === activeId);
+        const card = state.cards.find(c => c.id === state.activeCardId);
         if (!card) return;
+
+        const bal = typeof card.balance === 'number' ? card.balance : 0;
 
         const printArea = document.getElementById('printable-card-area');
         printArea.innerHTML = `
@@ -690,7 +836,7 @@ document.addEventListener('DOMContentLoaded', () => {
                         <p style="margin:4px 0; font-size:12px; color:#aaa;">Card ID: <b>${card.id}</b></p>
                         <p style="margin:2px 0; font-size:12px; color:#aaa;">Phone: ${card.phone}</p>
                         <div style="margin-top:8px; background:rgba(0,230,118,0.2); color:#00e676; padding:4px 8px; border-radius:6px; font-weight:bold; font-size:13px; display:inline-block;">
-                            INITIAL BALANCE: Rs. ${card.balance}
+                            INITIAL BALANCE: Rs. ${bal}
                         </div>
                     </div>
                     <div id="print-qr-target" style="background:#fff; padding:6px; border-radius:8px;"></div>
@@ -705,9 +851,6 @@ document.addEventListener('DOMContentLoaded', () => {
         }, 300);
     });
 
-    // ----------------------------------------------------------------------
-    // 9. EVENT LISTENERS
-    // ----------------------------------------------------------------------
     document.getElementById('gate-mode-entry').addEventListener('click', () => {
         state.gateMode = 'ENTRY';
         document.getElementById('gate-mode-entry').classList.add('active');
@@ -766,7 +909,7 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     function verifyAdminPin() {
-        if (pinInput.value === ADMIN_PIN_DEFAULT) {
+        if (pinInput.value === state.adminPin) {
             pinModal.classList.add('hidden');
             state.activeView = 'ADMIN';
             btnAdminMode.classList.add('active');
@@ -775,12 +918,13 @@ document.addEventListener('DOMContentLoaded', () => {
             guardView.classList.add('hidden');
             stopGuardCameraScanner();
         } else {
-            alert('❌ Galat PIN Code! Sahi Admin PIN daalein (Default: 1234).');
+            alert('❌ Galat Security PIN Code!');
             pinInput.value = '';
             pinInput.focus();
         }
     }
 
+    // Create Card Form
     document.getElementById('form-create-card').addEventListener('submit', (e) => {
         e.preventDefault();
 
@@ -807,8 +951,9 @@ document.addEventListener('DOMContentLoaded', () => {
         state.activeCardId = newId;
 
         renderApp();
+        displayCardPreview(newId);
         playGrantedSound();
-        alert(`✅ CARD ISSUED SUCCESSFULLY!\nCard ID: ${newId}\nBalance: Rs. ${initialBal}`);
+        alert(`✅ CARD ISSUED & SYNCED TO ALL DEVICES!\nCard ID: ${newId}\nBalance: Rs. ${initialBal}`);
         document.getElementById('form-create-card').reset();
     });
 

@@ -2,7 +2,8 @@
 <html lang="ur">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <!-- Viewport configured with maximum-scale=1.0 to prevent mobile auto-zoom on input focus -->
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Karachi Green Line BRT - Firebase PWA Smart System</title>
     <!-- PWA Manifest & Theme Color -->
     <link rel="manifest" href="manifest.json">
@@ -155,6 +156,9 @@
                         </button>
                         <button id="nav-gallery" class="nav-item">
                             <i class="fa-solid fa-qrcode"></i> QR Cards Gallery
+                        </button>
+                        <button id="nav-settings" class="nav-item">
+                            <i class="fa-solid fa-key"></i> Change PIN Code
                         </button>
                     </nav>
                 </aside>
@@ -366,23 +370,50 @@
                         </div>
                     </div>
 
+                    <!-- TAB 5: CHANGE ADMIN SECURITY PIN -->
+                    <div id="tab-settings-content" class="tab-page hidden">
+                        <div class="change-pin-box">
+                            <h2><i class="fa-solid fa-key"></i> Change Admin Security PIN Code</h2>
+                            <p class="pin-box-desc">Apna Admin Access PIN badalne ke liye purana aur naya PIN enter karein:</p>
+
+                            <form id="form-change-pin">
+                                <div class="form-group">
+                                    <label for="pin-old">Purana PIN Code (Old PIN):</label>
+                                    <input type="password" id="pin-old" maxlength="6" placeholder="••••" required>
+                                </div>
+
+                                <div class="form-group">
+                                    <label for="pin-new">Naya PIN Code (New 4-Digit PIN):</label>
+                                    <input type="password" id="pin-new" maxlength="6" placeholder="••••" required>
+                                </div>
+
+                                <div class="form-group">
+                                    <label for="pin-confirm">Naye PIN Ko Confirm Karein:</label>
+                                    <input type="password" id="pin-confirm" maxlength="6" placeholder="••••" required>
+                                </div>
+
+                                <button type="submit" class="btn btn-emerald btn-block">
+                                    <i class="fa-solid fa-shield"></i> Save New Security PIN
+                                </button>
+                            </form>
+                        </div>
+                    </div>
+
                 </section>
 
             </div>
         </main>
 
-        <!-- SECURITY PIN MODAL FOR ADMIN ACCESS -->
+        <!-- SECURITY PIN MODAL FOR ADMIN ACCESS (Clean without visible default hint) -->
         <div id="pin-modal" class="modal-backdrop hidden">
             <div class="modal-card">
                 <div class="modal-icon"><i class="fa-solid fa-shield-halved"></i></div>
                 <h2>Admin Security Access</h2>
-                <p>Admin Panel open karne ke liye 4-Digit Security PIN daalein:</p>
+                <p>Admin Panel open karne ke liye Security PIN daalein:</p>
                 
                 <div class="pin-input-group">
-                    <input type="password" id="pin-input" maxlength="4" placeholder="••••" autocomplete="off">
+                    <input type="password" id="pin-input" maxlength="6" placeholder="••••" autocomplete="off">
                 </div>
-                
-                <p class="pin-hint">Default Admin PIN: <strong>1234</strong></p>
                 
                 <div class="modal-buttons">
                     <button id="btn-cancel-pin" class="btn btn-outline">Cancel</button>
@@ -401,7 +432,7 @@
         if ('serviceWorker' in navigator) {
             window.addEventListener('load', () => {
                 navigator.serviceWorker.register('./sw.js')
-                    .then(reg => console.log('🟢 PWA Service Worker Registered Successfully!'))
+                    .then(reg => console.log('🟢 PWA Service Worker Registered!'))
                     .catch(err => console.log('PWA SW Register Error:', err));
             });
         }

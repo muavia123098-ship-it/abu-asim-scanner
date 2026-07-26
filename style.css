@@ -1,7 +1,7 @@
 /* ==========================================================================
    Karachi Green Line BRT - Smart QR Ticket & Reusable Card System
    Theme: Vibrant Emerald Green, Deep Slate Navy, Glassmorphism, Signal Red/Green
-   Fully Responsive for Mobile & Tablet screens
+   Fully Responsive for Mobile & Tablet screens (No Auto-Zooming on Mobile Inputs)
    ========================================================================== */
 
 :root {
@@ -29,6 +29,7 @@
     padding: 0;
     box-sizing: border-box;
     font-family: 'Outfit', system-ui, -apple-system, sans-serif;
+    touch-action: manipulation;
 }
 
 body {
@@ -40,6 +41,7 @@ body {
     align-items: flex-start;
     padding: 0;
     line-height: 1.5;
+    overflow-x: hidden;
 }
 
 .app-container {
@@ -350,7 +352,7 @@ body {
     border-radius: var(--radius-sm);
     padding: 10px 12px;
     color: #fff;
-    font-size: 0.85rem;
+    font-size: 16px; /* 16px prevents iOS/Android camera/viewport auto-zoom */
 }
 
 .scan-history-box {
@@ -494,6 +496,21 @@ body {
 .tab-page { display: flex; flex-direction: column; gap: 16px; }
 .tab-page.hidden { display: none !important; }
 
+/* CHANGE PIN CARD BOX */
+.change-pin-box {
+    background: var(--bg-card);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-lg);
+    padding: 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+    max-width: 480px;
+}
+
+.change-pin-box h2 { font-size: 1.1rem; color: var(--primary-green); display: flex; align-items: center; gap: 8px; }
+.pin-box-desc { font-size: 0.82rem; color: var(--text-muted); }
+
 /* STATS & ISSUE GRID */
 .stats-grid {
     display: grid;
@@ -555,7 +572,7 @@ body {
     border-radius: var(--radius-sm);
     padding: 10px 12px;
     color: #fff;
-    font-size: 0.88rem;
+    font-size: 16px; /* 16px prevents mobile auto-zoom */
     outline: none;
 }
 
@@ -887,21 +904,25 @@ body {
     border: 2px solid var(--primary-green);
     border-radius: var(--radius-md);
     padding: 10px;
-    font-size: 1.8rem;
-    letter-spacing: 10px;
+    font-size: 1.5rem;
+    letter-spacing: 8px;
     text-align: center;
     color: var(--primary-green);
     outline: none;
 }
 
-.pin-hint { font-size: 0.78rem; color: var(--text-muted); }
 .modal-buttons { display: flex; gap: 10px; width: 100%; }
 .modal-buttons .btn { flex: 1; }
 
 /* ==========================================
-   MOBILE & NARROW SCREEN SPECIFIC RESPONSIVE OVERRIDES
+   MOBILE RESPONSIVE & NO-AUTO-ZOOM OVERRIDES
    ========================================== */
 @media (max-width: 768px) {
+    /* 16px font-size forces iOS Safari & Android Chrome to NEVER zoom in on inputs */
+    input, select, textarea, button {
+        font-size: 16px !important;
+    }
+
     .app-header {
         flex-direction: column;
         align-items: stretch;
@@ -923,7 +944,7 @@ body {
         flex: 1;
         justify-content: center;
         padding: 8px 10px;
-        font-size: 0.8rem;
+        font-size: 0.8rem !important;
     }
 
     .admin-layout {
@@ -944,7 +965,7 @@ body {
     .nav-item {
         justify-content: center;
         padding: 10px 8px;
-        font-size: 0.8rem;
+        font-size: 0.8rem !important;
         text-align: center;
     }
 
