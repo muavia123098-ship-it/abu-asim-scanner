@@ -1,6 +1,6 @@
 /* ==========================================================================
    Karachi Green Line BRT - Smart QR Ticket & Reusable Card System
-   HD Camera Feed & Instant 60 FPS QR Scanner Tuning
+   Original White Square Box Area Restored for Mobile & Laptop
    ========================================================================== */
 
 :root {
@@ -292,27 +292,19 @@ html, body {
     border: none !important;
 }
 
-#qr-shaded-region,
 #reader__scan_region img,
 #reader__dashboard,
 #recharge-reader__scan_region img,
-#recharge-reader__dashboard,
-#reader div[style*="border"],
-#recharge-reader div[style*="border"] {
+#recharge-reader__dashboard {
     display: none !important;
-    opacity: 0 !important;
-    visibility: hidden !important;
-    width: 0 !important;
-    height: 0 !important;
 }
 
-/* Sharp HD Video feed without blur or pixelation filters */
+/* Sharp Video Feed */
 #reader video, #recharge-reader video {
     width: 100% !important;
     height: 100% !important;
     object-fit: cover !important;
     filter: contrast(106%) brightness(103%) !important;
-    image-rendering: auto !important;
 }
 
 .scan-laser {
@@ -333,21 +325,6 @@ html, body {
     50% { top: 94%; }
     100% { top: 3%; }
 }
-
-.scanner-corners span {
-    position: absolute;
-    width: 30px;
-    height: 30px;
-    border-color: var(--primary-green);
-    border-style: solid;
-    z-index: 6;
-    pointer-events: none;
-}
-
-.scanner-corners span:nth-child(1) { top: 12px; left: 12px; border-width: 4px 0 0 4px; }
-.scanner-corners span:nth-child(2) { top: 12px; right: 12px; border-width: 4px 4px 0 0; }
-.scanner-corners span:nth-child(3) { bottom: 12px; left: 12px; border-width: 0 0 4px 4px; }
-.scanner-corners span:nth-child(4) { bottom: 12px; right: 12px; border-width: 0 4px 4px 0; }
 
 .camera-controls { display: flex; gap: 10px; width: 100%; }
 
