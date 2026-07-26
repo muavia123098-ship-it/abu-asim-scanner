@@ -1,6 +1,6 @@
 /* ==========================================================================
    Karachi Green Line BRT - Smart QR Ticket & Reusable Card System
-   100% Clean Firestore REST API & Dual Cloud Sync Engine (Zero 404 Errors)
+   Pure Standard ZXing Engine (100% Reliable Multi-Device QR Decoding)
    ========================================================================== */
 
 document.addEventListener('DOMContentLoaded', () => {
@@ -70,7 +70,7 @@ document.addEventListener('DOMContentLoaded', () => {
     window.addEventListener('click', () => getAudioContext(), { once: true });
 
     // ----------------------------------------------------------------------
-    // 2. FIREBASE CONFIGURATION & FIRESTORE CLOUD ENGINE (ZERO 404 LOGS)
+    // 2. FIREBASE CONFIGURATION & CLOUD STORAGE ENGINE
     // ----------------------------------------------------------------------
     const firebaseConfig = {
         apiKey: "AIzaSyAVuxdQ-k8pZyy2PnoTwBG3XEpAt2-cLsc",
@@ -230,7 +230,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 .catch(err => console.warn("Firestore sync info:", err));
         }
 
-        // Native Firestore REST API update
         const firestoreFields = {
             fields: {
                 id: { stringValue: card.id },
@@ -350,7 +349,7 @@ document.addEventListener('DOMContentLoaded', () => {
         state.lastScanTime = now;
 
         const cardId = rawText.trim();
-        console.log("🟢 QR Code Detected:", cardId);
+        console.log("🟢 QR Code Decoded:", cardId);
 
         const card = state.cards.find(c => c.id.trim().toUpperCase() === cardId.toUpperCase());
 
@@ -467,28 +466,19 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // ----------------------------------------------------------------------
-    // 6. MULTI-DEVICE CAMERA ENGINE WITH FOCUSED DECODING
+    // 6. PURE STABLE SCANNER ENGINE FOR GUARD & RECHARGE
     // ----------------------------------------------------------------------
     function startGuardCameraScanner() {
         if (typeof Html5Qrcode === 'undefined') return;
         if (state.scannerActive) return;
 
         if (!html5QrCodeGuard) {
-            html5QrCodeGuard = new Html5Qrcode("reader", {
-                experimentalFeatures: {
-                    useBarCodeDetectorIfSupported: true
-                }
-            });
+            html5QrCodeGuard = new Html5Qrcode("reader");
         }
 
         const cameraConfig = {
-            fps: 30,
-            qrbox: (w, h) => {
-                const minDim = Math.min(w, h);
-                const boxSize = Math.floor(minDim * 0.65);
-                const finalSize = Math.min(Math.max(boxSize, 200), 250);
-                return { width: finalSize, height: finalSize };
-            },
+            fps: 20,
+            qrbox: { width: 250, height: 250 },
             disableFlip: false
         };
 
@@ -498,33 +488,29 @@ document.addEventListener('DOMContentLoaded', () => {
                     d.label.toLowerCase().includes('back') || 
                     d.label.toLowerCase().includes('rear') || 
                     d.label.toLowerCase().includes('environment')
-                ) || devices[devices.length - 1];
+                ) || devices[0];
 
                 html5QrCodeGuard.start(
                     backCam.id,
                     cameraConfig,
-                    (decodedText) => processGuardScan(decodedText),
-                    (err) => {}
+                    (text) => processGuardScan(text),
+                    () => {}
                 ).then(() => {
                     state.scannerActive = true;
                     document.getElementById('btn-start-camera').classList.add('hidden');
                     document.getElementById('btn-stop-camera').classList.remove('hidden');
-                }).catch(err => {
-                    startCameraFacingFallback("environment");
-                });
+                }).catch(err => startCameraFacingFallback("environment"));
             } else {
                 startCameraFacingFallback("environment");
             }
-        }).catch(err => {
-            startCameraFacingFallback("environment");
-        });
+        }).catch(err => startCameraFacingFallback("environment"));
 
         function startCameraFacingFallback(mode) {
             html5QrCodeGuard.start(
                 { facingMode: mode },
                 cameraConfig,
-                (decodedText) => processGuardScan(decodedText),
-                (err) => {}
+                (text) => processGuardScan(text),
+                () => {}
             ).then(() => {
                 state.scannerActive = true;
                 document.getElementById('btn-start-camera').classList.add('hidden');
@@ -554,21 +540,12 @@ document.addEventListener('DOMContentLoaded', () => {
         if (state.rechargeScannerActive) return;
 
         if (!html5QrCodeRecharge) {
-            html5QrCodeRecharge = new Html5Qrcode("recharge-reader", {
-                experimentalFeatures: {
-                    useBarCodeDetectorIfSupported: true
-                }
-            });
+            html5QrCodeRecharge = new Html5Qrcode("recharge-reader");
         }
 
         const cameraConfig = {
-            fps: 30,
-            qrbox: (w, h) => {
-                const minDim = Math.min(w, h);
-                const boxSize = Math.floor(minDim * 0.65);
-                const finalSize = Math.min(Math.max(boxSize, 200), 250);
-                return { width: finalSize, height: finalSize };
-            },
+            fps: 20,
+            qrbox: { width: 220, height: 220 },
             disableFlip: false
         };
 
@@ -578,16 +555,16 @@ document.addEventListener('DOMContentLoaded', () => {
                     d.label.toLowerCase().includes('back') || 
                     d.label.toLowerCase().includes('rear') || 
                     d.label.toLowerCase().includes('environment')
-                ) || devices[devices.length - 1];
+                ) || devices[0];
 
                 html5QrCodeRecharge.start(
                     backCam.id,
                     cameraConfig,
-                    (decodedText) => {
-                        fetchCardForRecharge(decodedText);
+                    (text) => {
+                        fetchCardForRecharge(text);
                         playGrantedSound();
                     },
-                    (err) => {}
+                    () => {}
                 ).then(() => {
                     state.rechargeScannerActive = true;
                     document.getElementById('btn-recharge-camera-start').classList.add('hidden');
@@ -602,11 +579,11 @@ document.addEventListener('DOMContentLoaded', () => {
             html5QrCodeRecharge.start(
                 { facingMode: mode },
                 cameraConfig,
-                (decodedText) => {
-                    fetchCardForRecharge(decodedText);
+                (text) => {
+                    fetchCardForRecharge(text);
                     playGrantedSound();
                 },
-                (err) => {}
+                () => {}
             ).then(() => {
                 state.rechargeScannerActive = true;
                 document.getElementById('btn-recharge-camera-start').classList.add('hidden');
