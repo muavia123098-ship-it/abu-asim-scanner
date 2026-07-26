@@ -1,6 +1,6 @@
 /* ==========================================================================
    Karachi Green Line BRT - Smart QR Ticket & Reusable Card System
-   Exact 1-to-1 Apple iPhone Style Dot QR Code Generator Engine
+   Exact 1-to-1 Rounded QR Code Generator Engine (Solid Dots & Rounded Finders)
    ========================================================================== */
 
 document.addEventListener('DOMContentLoaded', () => {
@@ -370,9 +370,9 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // ----------------------------------------------------------------------
-    // 4. EXACT APPLE IPHONE-STYLE ROUNDED DOT QR CODE GENERATOR
+    // 4. EXACT 1-TO-1 ROUNDED QR CODE GENERATOR (SOLID DOTS & ROUNDED FINDERS)
     // ----------------------------------------------------------------------
-    function generateQRCode(elementId, textData, size = 120) {
+    function generateQRCode(elementId, textData, size = 130) {
         const container = document.getElementById(elementId);
         if (!container) return;
 
@@ -381,6 +381,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         container.setAttribute('data-qr-rendered', textData);
+        container.innerHTML = '';
 
         if (typeof QRCode !== 'undefined') {
             const tempDiv = document.createElement('div');
@@ -389,8 +390,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
             new QRCode(tempDiv, {
                 text: textData,
-                width: size,
-                height: size,
+                width: 200,
+                height: 200,
                 colorDark: "#000000",
                 colorLight: "#ffffff",
                 correctLevel: QRCode.CorrectLevel.H
@@ -399,36 +400,68 @@ document.addEventListener('DOMContentLoaded', () => {
             setTimeout(() => {
                 const origCanvas = tempDiv.querySelector('canvas');
                 if (origCanvas) {
+                    const w = origCanvas.width;
+                    const h = origCanvas.height;
+                    const origCtx = origCanvas.getContext('2d');
+                    const imgData = origCtx.getImageData(0, 0, w, h);
+                    const pixels = imgData.data;
+
+                    // 1. Find exact bounding box of dark pixels
+                    let minX = w, maxX = 0, minY = h, maxY = 0;
+                    for (let y = 0; y < h; y++) {
+                        for (let x = 0; x < w; x++) {
+                            const idx = (y * w + x) * 4;
+                            if (pixels[idx] < 128) {
+                                if (x < minX) minX = x;
+                                if (x > maxX) maxX = x;
+                                if (y < minY) minY = y;
+                                if (y > maxY) maxY = y;
+                            }
+                        }
+                    }
+
+                    if (maxX <= minX || maxY <= minY) {
+                        container.innerHTML = tempDiv.innerHTML;
+                        tempDiv.remove();
+                        return;
+                    }
+
+                    const qrW = maxX - minX + 1;
+                    const qrH = maxY - minY + 1;
+
+                    // 2. Determine module count by testing standard QR grid sizes
+                    const possibleCols = [21, 25, 29, 33, 37, 41, 45];
+                    let cols = 29;
+                    let minRem = 999;
+
+                    possibleCols.forEach(c => {
+                        const rem = Math.abs((qrW / c) - Math.round(qrW / c));
+                        if (rem < minRem) {
+                            minRem = rem;
+                            cols = c;
+                        }
+                    });
+
+                    // 3. Setup Dot Canvas
                     const dotCanvas = document.createElement('canvas');
                     dotCanvas.width = size;
                     dotCanvas.height = size;
                     const ctx = dotCanvas.getContext('2d');
 
-                    const origCtx = origCanvas.getContext('2d');
-                    const w = origCanvas.width;
-                    const h = origCanvas.height;
-                    const imgData = origCtx.getImageData(0, 0, w, h);
-                    const pixels = imgData.data;
-
-                    // 1. Fill clean white background with rounded corner feel
+                    // Pure White Background
                     ctx.fillStyle = '#ffffff';
                     ctx.fillRect(0, 0, size, size);
 
-                    // 2. Sample pixel module grid
-                    let firstBlackWidth = 0;
-                    for (let x = 0; x < w; x++) {
-                        const idx = (0 * w + x) * 4;
-                        if (pixels[idx] < 80) firstBlackWidth++;
-                        else if (firstBlackWidth > 0) break;
-                    }
+                    const margin = size * 0.05;
+                    const drawSize = size - (margin * 2);
+                    const scale = drawSize / cols;
+                    const offsetX = margin;
+                    const offsetY = margin;
+                    const primaryColor = '#000000';
 
-                    const cols = Math.round(w / (firstBlackWidth || 1)) || 29;
-                    const cellSize = size / cols;
-                    const primaryColor = '#0b2545'; // Premium Apple Navy Color
-
-                    // 3. Render Circular Data Dots
+                    // 4. Draw Solid Circular Data Dots
                     ctx.fillStyle = primaryColor;
-                    const dotRadius = cellSize * 0.40;
+                    const dotRadius = (scale / 2) * 0.88;
 
                     for (let r = 0; r < cols; r++) {
                         for (let c = 0; c < cols; c++) {
@@ -439,13 +472,13 @@ document.addEventListener('DOMContentLoaded', () => {
 
                             if (isFinderTL || isFinderTR || isFinderBL) continue;
 
-                            const px = Math.floor((r + 0.5) * (w / cols));
-                            const py = Math.floor((c + 0.5) * (h / cols));
+                            const px = Math.floor(minX + (r + 0.5) * (qrW / cols));
+                            const py = Math.floor(minY + (c + 0.5) * (qrH / cols));
                             const idx = (py * w + px) * 4;
 
                             if (pixels[idx] < 128) {
-                                const cx = (r + 0.5) * cellSize;
-                                const cy = (c + 0.5) * cellSize;
+                                const cx = offsetX + (r + 0.5) * scale;
+                                const cy = offsetY + (c + 0.5) * scale;
 
                                 ctx.beginPath();
                                 ctx.arc(cx, cy, dotRadius, 0, Math.PI * 2);
@@ -454,45 +487,46 @@ document.addEventListener('DOMContentLoaded', () => {
                         }
                     }
 
-                    // 4. Render Exact Apple-Style Concentric Finder Patterns
-                    function drawAppleFinder(startX, startY) {
-                        const finderSize = 7 * cellSize;
-                        const strokeW = cellSize * 0.95;
-                        const cornerR = cellSize * 2.0;
+                    // 5. Draw Exact Rounded Finder Patterns
+                    function drawRoundedFinder(startCol, startRow) {
+                        const fx = offsetX + startCol * scale;
+                        const fy = offsetY + startRow * scale;
+                        const fSize = 7 * scale;
 
                         // Outer Rounded Box Border
+                        const strokeW = scale * 0.95;
                         ctx.lineWidth = strokeW;
                         ctx.strokeStyle = primaryColor;
                         ctx.beginPath();
                         const inset = strokeW / 2;
                         ctx.roundRect(
-                            startX + inset, 
-                            startY + inset, 
-                            finderSize - strokeW, 
-                            finderSize - strokeW, 
-                            cornerR
+                            fx + inset, 
+                            fy + inset, 
+                            fSize - strokeW, 
+                            fSize - strokeW, 
+                            scale * 1.8
                         );
                         ctx.stroke();
 
-                        // Inner Solid Round Eye Circle
-                        const eyeCx = startX + finderSize / 2;
-                        const eyeCy = startY + finderSize / 2;
-                        const eyeRadius = cellSize * 1.5;
+                        // Inner Eye (Solid Rounded Square)
+                        const eyeX = fx + 1.5 * scale;
+                        const eyeY = fy + 1.5 * scale;
+                        const eyeSize = 4 * scale;
 
                         ctx.fillStyle = primaryColor;
                         ctx.beginPath();
-                        ctx.arc(eyeCx, eyeCy, eyeRadius, 0, Math.PI * 2);
+                        ctx.roundRect(eyeX, eyeY, eyeSize, eyeSize, scale * 1.2);
                         ctx.fill();
                     }
 
                     // Top-Left Finder
-                    drawAppleFinder(0, 0);
+                    drawRoundedFinder(0, 0);
 
                     // Top-Right Finder
-                    drawAppleFinder((cols - 7) * cellSize, 0);
+                    drawRoundedFinder(cols - 7, 0);
 
                     // Bottom-Left Finder
-                    drawAppleFinder(0, (cols - 7) * cellSize);
+                    drawRoundedFinder(0, cols - 7);
 
                     container.innerHTML = '';
                     container.appendChild(dotCanvas);
@@ -500,7 +534,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     container.innerHTML = `<div style="padding:8px; background:#fff; color:#000; font-size:9px; word-break:break-all; text-align:center;"><b>${textData}</b></div>`;
                 }
                 tempDiv.remove();
-            }, 15);
+            }, 20);
         } else {
             container.innerHTML = `<div style="padding:8px; background:#fff; color:#000; font-size:9px; word-break:break-all; text-align:center;"><b>${textData}</b></div>`;
         }
@@ -557,7 +591,7 @@ document.addEventListener('DOMContentLoaded', () => {
         } else {
             // EXIT GATE MODE
             if (card.status !== 'IN_TRANSIT') {
-                triggerSignalResult(false, 'NO ENTRY RECORD 🟡', `${card.name} Ka Entry Record Mila!\nPehle Entry Gate Scan Karein.`);
+                triggerSignalResult(false, 'NO ENTRY RECORD 🟡', `${card.name} Ka Entry Record Nahi Mila!\nPehle Entry Gate Scan Karein.`);
                 addScanHistoryLog(card.id, card.name, 'DENIED - NO ENTRY LOG', 0);
                 return;
             }
