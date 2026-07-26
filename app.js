@@ -1,6 +1,6 @@
 /* ==========================================================================
    Karachi Green Line BRT - Smart QR Ticket & Reusable Card System
-   Exact 1-to-1 Rounded QR Code Generator Engine (Solid Dots & Rounded Finders)
+   Official QRCodeStyling Engine for Spec-Compliant Scannable Dot QR Codes
    ========================================================================== */
 
 document.addEventListener('DOMContentLoaded', () => {
@@ -370,9 +370,9 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // ----------------------------------------------------------------------
-    // 4. EXACT 1-TO-1 ROUNDED QR CODE GENERATOR (SOLID DOTS & ROUNDED FINDERS)
+    // 4. OFFICIAL SPEC-COMPLIANT QRCodeStyling ENGINE (INSTANT SCANNABLE DOT QR)
     // ----------------------------------------------------------------------
-    function generateQRCode(elementId, textData, size = 130) {
+    function generateQRCode(elementId, textData, size = 125) {
         const container = document.getElementById(elementId);
         if (!container) return;
 
@@ -383,158 +383,42 @@ document.addEventListener('DOMContentLoaded', () => {
         container.setAttribute('data-qr-rendered', textData);
         container.innerHTML = '';
 
-        if (typeof QRCode !== 'undefined') {
-            const tempDiv = document.createElement('div');
-            tempDiv.style.display = 'none';
-            document.body.appendChild(tempDiv);
+        if (typeof QRCodeStyling !== 'undefined') {
+            const qrCode = new QRCodeStyling({
+                width: size,
+                height: size,
+                type: "canvas",
+                data: textData,
+                dotsOptions: {
+                    color: "#000000",
+                    type: "dots"
+                },
+                backgroundOptions: {
+                    color: "#ffffff"
+                },
+                cornersSquareOptions: {
+                    color: "#000000",
+                    type: "extra-rounded"
+                },
+                cornersDotOptions: {
+                    color: "#000000",
+                    type: "dot"
+                },
+                qrOptions: {
+                    errorCorrectionLevel: "H"
+                }
+            });
 
-            new QRCode(tempDiv, {
+            qrCode.append(container);
+        } else if (typeof QRCode !== 'undefined') {
+            new QRCode(container, {
                 text: textData,
-                width: 200,
-                height: 200,
+                width: size,
+                height: size,
                 colorDark: "#000000",
                 colorLight: "#ffffff",
                 correctLevel: QRCode.CorrectLevel.H
             });
-
-            setTimeout(() => {
-                const origCanvas = tempDiv.querySelector('canvas');
-                if (origCanvas) {
-                    const w = origCanvas.width;
-                    const h = origCanvas.height;
-                    const origCtx = origCanvas.getContext('2d');
-                    const imgData = origCtx.getImageData(0, 0, w, h);
-                    const pixels = imgData.data;
-
-                    // 1. Find exact bounding box of dark pixels
-                    let minX = w, maxX = 0, minY = h, maxY = 0;
-                    for (let y = 0; y < h; y++) {
-                        for (let x = 0; x < w; x++) {
-                            const idx = (y * w + x) * 4;
-                            if (pixels[idx] < 128) {
-                                if (x < minX) minX = x;
-                                if (x > maxX) maxX = x;
-                                if (y < minY) minY = y;
-                                if (y > maxY) maxY = y;
-                            }
-                        }
-                    }
-
-                    if (maxX <= minX || maxY <= minY) {
-                        container.innerHTML = tempDiv.innerHTML;
-                        tempDiv.remove();
-                        return;
-                    }
-
-                    const qrW = maxX - minX + 1;
-                    const qrH = maxY - minY + 1;
-
-                    // 2. Determine module count by testing standard QR grid sizes
-                    const possibleCols = [21, 25, 29, 33, 37, 41, 45];
-                    let cols = 29;
-                    let minRem = 999;
-
-                    possibleCols.forEach(c => {
-                        const rem = Math.abs((qrW / c) - Math.round(qrW / c));
-                        if (rem < minRem) {
-                            minRem = rem;
-                            cols = c;
-                        }
-                    });
-
-                    // 3. Setup Dot Canvas
-                    const dotCanvas = document.createElement('canvas');
-                    dotCanvas.width = size;
-                    dotCanvas.height = size;
-                    const ctx = dotCanvas.getContext('2d');
-
-                    // Pure White Background
-                    ctx.fillStyle = '#ffffff';
-                    ctx.fillRect(0, 0, size, size);
-
-                    const margin = size * 0.05;
-                    const drawSize = size - (margin * 2);
-                    const scale = drawSize / cols;
-                    const offsetX = margin;
-                    const offsetY = margin;
-                    const primaryColor = '#000000';
-
-                    // 4. Draw Solid Circular Data Dots
-                    ctx.fillStyle = primaryColor;
-                    const dotRadius = (scale / 2) * 0.88;
-
-                    for (let r = 0; r < cols; r++) {
-                        for (let c = 0; c < cols; c++) {
-                            // Skip the 3 Finder Pattern Corner Zones (7x7 modules)
-                            const isFinderTL = (r < 7 && c < 7);
-                            const isFinderTR = (r >= cols - 7 && c < 7);
-                            const isFinderBL = (r < 7 && c >= cols - 7);
-
-                            if (isFinderTL || isFinderTR || isFinderBL) continue;
-
-                            const px = Math.floor(minX + (r + 0.5) * (qrW / cols));
-                            const py = Math.floor(minY + (c + 0.5) * (qrH / cols));
-                            const idx = (py * w + px) * 4;
-
-                            if (pixels[idx] < 128) {
-                                const cx = offsetX + (r + 0.5) * scale;
-                                const cy = offsetY + (c + 0.5) * scale;
-
-                                ctx.beginPath();
-                                ctx.arc(cx, cy, dotRadius, 0, Math.PI * 2);
-                                ctx.fill();
-                            }
-                        }
-                    }
-
-                    // 5. Draw Exact Rounded Finder Patterns
-                    function drawRoundedFinder(startCol, startRow) {
-                        const fx = offsetX + startCol * scale;
-                        const fy = offsetY + startRow * scale;
-                        const fSize = 7 * scale;
-
-                        // Outer Rounded Box Border
-                        const strokeW = scale * 0.95;
-                        ctx.lineWidth = strokeW;
-                        ctx.strokeStyle = primaryColor;
-                        ctx.beginPath();
-                        const inset = strokeW / 2;
-                        ctx.roundRect(
-                            fx + inset, 
-                            fy + inset, 
-                            fSize - strokeW, 
-                            fSize - strokeW, 
-                            scale * 1.8
-                        );
-                        ctx.stroke();
-
-                        // Inner Eye (Solid Rounded Square)
-                        const eyeX = fx + 1.5 * scale;
-                        const eyeY = fy + 1.5 * scale;
-                        const eyeSize = 4 * scale;
-
-                        ctx.fillStyle = primaryColor;
-                        ctx.beginPath();
-                        ctx.roundRect(eyeX, eyeY, eyeSize, eyeSize, scale * 1.2);
-                        ctx.fill();
-                    }
-
-                    // Top-Left Finder
-                    drawRoundedFinder(0, 0);
-
-                    // Top-Right Finder
-                    drawRoundedFinder(cols - 7, 0);
-
-                    // Bottom-Left Finder
-                    drawRoundedFinder(0, cols - 7);
-
-                    container.innerHTML = '';
-                    container.appendChild(dotCanvas);
-                } else {
-                    container.innerHTML = `<div style="padding:8px; background:#fff; color:#000; font-size:9px; word-break:break-all; text-align:center;"><b>${textData}</b></div>`;
-                }
-                tempDiv.remove();
-            }, 20);
         } else {
             container.innerHTML = `<div style="padding:8px; background:#fff; color:#000; font-size:9px; word-break:break-all; text-align:center;"><b>${textData}</b></div>`;
         }
@@ -686,6 +570,9 @@ document.addEventListener('DOMContentLoaded', () => {
                 const min = Math.min(w, h);
                 const size = Math.floor(min * 0.55);
                 return { width: Math.max(size, 180), height: Math.max(size, 180) };
+            },
+            experimentalFeatures: {
+                useBarCodeDetectorIfSupported: true
             }
         };
 
@@ -738,6 +625,9 @@ document.addEventListener('DOMContentLoaded', () => {
                 const min = Math.min(w, h);
                 const size = Math.floor(min * 0.55);
                 return { width: Math.max(size, 180), height: Math.max(size, 180) };
+            },
+            experimentalFeatures: {
+                useBarCodeDetectorIfSupported: true
             }
         };
 
