@@ -1,24 +1,20 @@
 /* ==========================================================================
    Karachi Green Line BRT - Smart QR Ticket & Reusable Card System
-   Firebase Cloud Firestore + PWA Home Screen App Installer Integration
+   Low-Quality Tablet Camera Scanner Optimizations & High-Speed Recognition
    ========================================================================== */
 
 document.addEventListener('DOMContentLoaded', () => {
 
     // ----------------------------------------------------------------------
-    // 1. PWA MOBILE INSTALL PROMPT EVENT LISTENER
+    // 1. PWA & AUDIO UNLOCK FOR MOBILE/TABLET BROWSERS
     // ----------------------------------------------------------------------
     let deferredPrompt = null;
     const btnInstallPwa = document.getElementById('btn-install-pwa');
 
     window.addEventListener('beforeinstallprompt', (e) => {
-        // Prevent default browser banner
         e.preventDefault();
         deferredPrompt = e;
-        // Show our custom Install App button
-        if (btnInstallPwa) {
-            btnInstallPwa.classList.remove('hidden');
-        }
+        if (btnInstallPwa) btnInstallPwa.classList.remove('hidden');
     });
 
     if (btnInstallPwa) {
@@ -26,14 +22,27 @@ document.addEventListener('DOMContentLoaded', () => {
             if (deferredPrompt) {
                 deferredPrompt.prompt();
                 const { outcome } = await deferredPrompt.userChoice;
-                console.log(`PWA Install Choice Outcome: ${outcome}`);
                 deferredPrompt = null;
                 btnInstallPwa.classList.add('hidden');
             } else {
-                alert('📲 App Install Tips:\n\n• Mobile Chrome / Edge: Top 3-dots menu par click karke "Add to Home screen" ya "Install App" select karein.\n• iPhone Safari: Share button par tap karke "Add to Home Screen" select karein!');
+                alert('📲 App Install Tips:\n• Chrome: Menu -> "Add to Home screen"\n• Safari: Share -> "Add to Home Screen"');
             }
         });
     }
+
+    let audioCtx = null;
+    function getAudioContext() {
+        if (!audioCtx) {
+            audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        }
+        if (audioCtx.state === 'suspended') {
+            audioCtx.resume().catch(e => console.log('Audio resume error:', e));
+        }
+        return audioCtx;
+    }
+
+    window.addEventListener('touchstart', () => getAudioContext(), { once: true });
+    window.addEventListener('click', () => getAudioContext(), { once: true });
 
     // ----------------------------------------------------------------------
     // 2. FIREBASE CONFIGURATION & CLOUD INITIALIZATION
@@ -57,11 +66,11 @@ document.addEventListener('DOMContentLoaded', () => {
             isCloudOnline = true;
             console.log("🟢 Firebase Real-Time Cloud Firestore Connected!");
         } catch (e) {
-            console.error("Firebase init error, fallback to LocalStorage:", e);
+            console.error("Firebase init fallback:", e);
         }
     }
 
-    const FARE_PER_SCAN = 25; // Flat Rs. 25 deducted on every scan
+    const FARE_PER_SCAN = 25;
     const ADMIN_PIN_DEFAULT = "1234";
 
     let state = {
@@ -69,7 +78,7 @@ document.addEventListener('DOMContentLoaded', () => {
         revenue: 0,
         gateMode: 'ENTRY', // 'ENTRY' or 'EXIT'
         activeView: 'GUARD', // 'GUARD' or 'ADMIN'
-        activeAdminTab: 'dash', // 'dash', 'issue', 'recharge', 'gallery'
+        activeAdminTab: 'dash',
         scannerActive: false,
         rechargeScannerActive: false,
         lastScanTime: 0,
@@ -80,8 +89,9 @@ document.addEventListener('DOMContentLoaded', () => {
     let html5QrCodeGuard = null;
     let html5QrCodeRecharge = null;
 
-    // Load initial state & Listen to Firebase Real-time Changes
     function initStore() {
+        loadLocalStorageBackup();
+
         if (isCloudOnline && db) {
             db.collection("cards").onSnapshot((snapshot) => {
                 const cloudCards = [];
@@ -93,17 +103,15 @@ document.addEventListener('DOMContentLoaded', () => {
                     if (data.initialBalance) calcRevenue += data.initialBalance;
                 });
 
-                state.cards = cloudCards;
-                state.revenue = calcRevenue;
-
-                saveLocalStorageBackup();
-                renderApp();
+                if (cloudCards.length > 0) {
+                    state.cards = cloudCards;
+                    state.revenue = calcRevenue;
+                    saveLocalStorageBackup();
+                    renderApp();
+                }
             }, (error) => {
-                console.warn("Firestore sync error, loading local backup:", error);
-                loadLocalStorageBackup();
+                console.warn("Firebase notice (using local storage):", error);
             });
-        } else {
-            loadLocalStorageBackup();
         }
     }
 
@@ -133,25 +141,13 @@ document.addEventListener('DOMContentLoaded', () => {
         if (isCloudOnline && db) {
             db.collection("cards").doc(card.id).set(card, { merge: true })
                 .then(() => console.log(`Cloud Synced: ${card.id}`))
-                .catch(err => console.error("Cloud Save Error:", err));
+                .catch(err => console.warn("Cloud write info:", err));
         }
     }
 
     // ----------------------------------------------------------------------
-    // 3. WEB AUDIO API SOUND SYNTHESIZER
+    // 3. SOUND SYNTHESIZER
     // ----------------------------------------------------------------------
-    let audioCtx = null;
-
-    function getAudioContext() {
-        if (!audioCtx) {
-            audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-        }
-        if (audioCtx.state === 'suspended') {
-            audioCtx.resume();
-        }
-        return audioCtx;
-    }
-
     function playGrantedSound() {
         try {
             const ctx = getAudioContext();
@@ -215,9 +211,9 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // ----------------------------------------------------------------------
-    // 4. QR CODE GENERATOR UTILITY
+    // 4. HIGH-CONTRAST QR CODE GENERATOR FOR LOW-RES TABLET CAMERAS
     // ----------------------------------------------------------------------
-    function generateQRCode(elementId, textData, size = 95) {
+    function generateQRCode(elementId, textData, size = 100) {
         const container = document.getElementById(elementId);
         if (!container) return;
         container.innerHTML = '';
@@ -240,15 +236,20 @@ document.addEventListener('DOMContentLoaded', () => {
     // 5. GUARD SCANNER & GATE SCANNING CORE LOGIC
     // ----------------------------------------------------------------------
     function processGuardScan(rawText) {
+        if (!rawText) return;
+
         const now = Date.now();
-        if (now - state.lastScanTime < 1500) return;
+        // 1.2 Second debounce lock
+        if (now - state.lastScanTime < 1200) return;
         state.lastScanTime = now;
 
         const cardId = rawText.trim();
+        console.log("Scanned QR Code Text:", cardId);
+
         const card = state.cards.find(c => c.id.toUpperCase() === cardId.toUpperCase());
 
         if (!card) {
-            triggerSignalResult(false, 'INVALID / TAMPERED QR', 'Yeh QR Code System DB Mein Register Nahi Hai!');
+            triggerSignalResult(false, 'INVALID / TAMPERED QR', `QR Code "${cardId}" System DB Mein Register Nahi Hai!`);
             addScanHistoryLog(cardId, 'Unknown', 'DENIED - FAKE/UNREGISTERED', 0);
             return;
         }
@@ -271,6 +272,7 @@ document.addEventListener('DOMContentLoaded', () => {
             card.status = 'IN_TRANSIT';
             
             syncCardToCloud(card);
+            renderApp();
 
             triggerSignalResult(true, 'ENTRY GRANTED 🟢', `Fare Deducted: Rs. ${FARE_PER_SCAN} | Remaining Balance: Rs. ${card.balance}`, card.name);
             addScanHistoryLog(card.id, card.name, 'GRANTED (ENTRY)', FARE_PER_SCAN);
@@ -293,6 +295,7 @@ document.addEventListener('DOMContentLoaded', () => {
             card.status = 'COMPLETED';
 
             syncCardToCloud(card);
+            renderApp();
 
             triggerSignalResult(true, 'EXIT CLEARED 🟢', `Journey Complete | Final Fare Deducted: Rs. ${FARE_PER_SCAN} | Remaining: Rs. ${card.balance}`, card.name);
             addScanHistoryLog(card.id, card.name, 'GRANTED (EXIT)', FARE_PER_SCAN);
@@ -355,16 +358,32 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // ----------------------------------------------------------------------
-    // 6. CAMERA SCANNER LOGIC
+    // 6. HIGH-SPEED TABLET CAMERA SCANNER ENGINE (30 FPS & BARCODE DETECTOR)
     // ----------------------------------------------------------------------
     function startGuardCameraScanner() {
         if (typeof Html5Qrcode === 'undefined') return;
 
         if (!html5QrCodeGuard) {
-            html5QrCodeGuard = new Html5Qrcode("reader");
+            // Enable native BarcodeDetector API for 10x faster scanning on tablets
+            html5QrCodeGuard = new Html5Qrcode("reader", {
+                experimentalFeatures: {
+                    useBarCodeDetectorIfSupported: true
+                }
+            });
         }
 
-        const config = { fps: 15, qrbox: { width: 220, height: 220 } };
+        // High frequency scanning & dynamic viewfinder for low-res tablet cameras
+        const config = {
+            fps: 30,
+            qrbox: (viewfinderWidth, viewfinderHeight) => {
+                const minEdge = Math.min(viewfinderWidth, viewfinderHeight);
+                return {
+                    width: Math.floor(minEdge * 0.85),
+                    height: Math.floor(minEdge * 0.85)
+                };
+            },
+            disableFlip: false
+        };
 
         html5QrCodeGuard.start(
             { facingMode: "environment" },
@@ -376,7 +395,8 @@ document.addEventListener('DOMContentLoaded', () => {
             document.getElementById('btn-start-camera').classList.add('hidden');
             document.getElementById('btn-stop-camera').classList.remove('hidden');
         }).catch(err => {
-            alert('Camera access denied ya camera open nahi ho saka.');
+            alert('Tablet Camera Settings: Browser mein camera permission allow karein.');
+            console.log('Tablet Camera Error:', err);
         });
     }
 
@@ -394,10 +414,20 @@ document.addEventListener('DOMContentLoaded', () => {
         if (typeof Html5Qrcode === 'undefined') return;
 
         if (!html5QrCodeRecharge) {
-            html5QrCodeRecharge = new Html5Qrcode("recharge-reader");
+            html5QrCodeRecharge = new Html5Qrcode("recharge-reader", {
+                experimentalFeatures: {
+                    useBarCodeDetectorIfSupported: true
+                }
+            });
         }
 
-        const config = { fps: 15, qrbox: { width: 180, height: 180 } };
+        const config = {
+            fps: 30,
+            qrbox: (w, h) => {
+                const edge = Math.min(w, h);
+                return { width: Math.floor(edge * 0.85), height: Math.floor(edge * 0.85) };
+            }
+        };
 
         html5QrCodeRecharge.start(
             { facingMode: "environment" },
@@ -432,7 +462,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const resultContainer = document.getElementById('recharge-card-result');
 
         if (!card) {
-            alert(`❌ Card ID "${cardId}" Firebase Database Mein Nahi Mil Saka!`);
+            alert(`❌ Card ID "${cardId}" System Database Mein Nahi Mil Saka!`);
             resultContainer.classList.add('hidden');
             return;
         }
@@ -467,7 +497,7 @@ document.addEventListener('DOMContentLoaded', () => {
             playGrantedSound();
 
             document.getElementById('rc-balance').textContent = `Rs. ${card.balance}`;
-            alert(`⚡ FIREBASE CLOUD RECHARGE SUCCESSFUL!\nPassenger: ${card.name}\nNaya Balance: Rs. ${card.balance}`);
+            alert(`⚡ RECHARGE SUCCESSFUL!\nPassenger: ${card.name}\nNaya Balance: Rs. ${card.balance}`);
         }
     });
 
@@ -503,7 +533,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 state.cards.map(c => `<option value="${c.id}">${c.name} (${c.id}) - Balance: Rs. ${c.balance}</option>`).join('');
         }
 
-        // Render Cards Gallery
+        // Render Cards Gallery with 140px High-Contrast QR for Tablet Cameras
         const galleryGrid = document.getElementById('qr-gallery-grid');
         if (galleryGrid) {
             if (state.cards.length === 0) {
@@ -523,7 +553,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 `).join('');
 
                 state.cards.forEach(c => {
-                    generateQRCode(`gallery-qr-${c.id}`, c.id, 120);
+                    generateQRCode(`gallery-qr-${c.id}`, c.id, 140);
                 });
             }
         }
@@ -532,7 +562,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const tbody = document.getElementById('cards-table-body');
         if (tbody) {
             if (state.cards.length === 0) {
-                tbody.innerHTML = `<tr><td colspan="6" style="text-align:center; color:#8e9bb0; padding:20px;">Firebase Cloud DB Mein Koi Record Nahi Hai. Pehla card banayein!</td></tr>`;
+                tbody.innerHTML = `<tr><td colspan="6" style="text-align:center; color:#8e9bb0; padding:20px;">System DB Mein Koi Record Nahi Hai. Pehla card banayein!</td></tr>`;
             } else {
                 tbody.innerHTML = state.cards.map(c => `
                     <tr>
@@ -596,7 +626,7 @@ document.addEventListener('DOMContentLoaded', () => {
             statusEl.className = 'status-badge status-active';
         }
 
-        generateQRCode('preview-qr-code', card.id, 95);
+        generateQRCode('preview-qr-code', card.id, 105);
     }
 
     function switchAdminTab(tabName) {
@@ -751,7 +781,6 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-    // Create Card Form
     document.getElementById('form-create-card').addEventListener('submit', (e) => {
         e.preventDefault();
 
@@ -773,14 +802,15 @@ document.addEventListener('DOMContentLoaded', () => {
             createdAt: new Date().toLocaleDateString()
         };
 
+        state.cards.push(newCard);
         syncCardToCloud(newCard);
         state.activeCardId = newId;
 
+        renderApp();
         playGrantedSound();
-        alert(`✅ FIREBASE REAL-TIME CLOUD CARD ISSUED!\nCard ID: ${newId}\nBalance: Rs. ${initialBal}`);
+        alert(`✅ CARD ISSUED SUCCESSFULLY!\nCard ID: ${newId}\nBalance: Rs. ${initialBal}`);
         document.getElementById('form-create-card').reset();
     });
 
-    // Initialize Store & Firebase listener
     initStore();
 });
