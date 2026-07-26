@@ -1,6 +1,6 @@
 /* ==========================================================================
    Karachi Green Line BRT - Smart QR Ticket & Reusable Card System
-   Optimized Mobile Scanner: 10 FPS, Focused 55% QR Box & Debug Log Callback
+   Root Cause Fix: Safe Null/Undefined Check for c.id.trim() in processGuardScan
    ========================================================================== */
 
 document.addEventListener('DOMContentLoaded', () => {
@@ -124,7 +124,9 @@ document.addEventListener('DOMContentLoaded', () => {
                 db.collection("cards").onSnapshot((snapshot) => {
                     const cloudCards = [];
                     snapshot.forEach((doc) => {
-                        cloudCards.push(doc.data());
+                        if (doc.exists && doc.data()) {
+                            cloudCards.push(doc.data());
+                        }
                     });
                     if (cloudCards.length > 0) {
                         mergeAndRenderCards(cloudCards);
@@ -159,16 +161,16 @@ document.addEventListener('DOMContentLoaded', () => {
                         const initBal = fields.initialBalance ? (fields.initialBalance.doubleValue !== undefined ? fields.initialBalance.doubleValue : parseInt(fields.initialBalance.integerValue || 0)) : 0;
 
                         return {
-                            id: fields.id ? fields.id.stringValue : '',
-                            name: fields.name ? fields.name.stringValue : '',
-                            phone: fields.phone ? fields.phone.stringValue : '',
-                            cnic: fields.cnic ? fields.cnic.stringValue : '',
+                            id: fields.id && fields.id.stringValue ? fields.id.stringValue : '',
+                            name: fields.name && fields.name.stringValue ? fields.name.stringValue : '',
+                            phone: fields.phone && fields.phone.stringValue ? fields.phone.stringValue : '',
+                            cnic: fields.cnic && fields.cnic.stringValue ? fields.cnic.stringValue : '',
                             balance: typeof bal === 'number' ? bal : 0,
                             initialBalance: typeof initBal === 'number' ? initBal : 0,
-                            status: fields.status ? fields.status.stringValue : 'COMPLETED',
-                            createdAt: fields.createdAt ? fields.createdAt.stringValue : ''
+                            status: fields.status && fields.status.stringValue ? fields.status.stringValue : 'COMPLETED',
+                            createdAt: fields.createdAt && fields.createdAt.stringValue ? fields.createdAt.stringValue : ''
                         };
-                    }).filter(c => c.id);
+                    }).filter(c => c && c.id);
 
                     if (cloudCards.length > 0) {
                         mergeAndRenderCards(cloudCards);
@@ -180,8 +182,18 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function mergeAndRenderCards(cloudCards) {
         const map = new Map();
-        state.cards.forEach(c => map.set(c.id, c));
-        cloudCards.forEach(c => map.set(c.id, c));
+
+        state.cards.forEach(c => {
+            if (c && c.id && typeof c.id === 'string') {
+                map.set(c.id.trim().toUpperCase(), c);
+            }
+        });
+
+        cloudCards.forEach(c => {
+            if (c && c.id && typeof c.id === 'string') {
+                map.set(c.id.trim().toUpperCase(), c);
+            }
+        });
 
         state.cards = Array.from(map.values());
         
@@ -202,7 +214,12 @@ document.addEventListener('DOMContentLoaded', () => {
 
         if (savedCards) {
             try {
-                state.cards = JSON.parse(savedCards);
+                const parsed = JSON.parse(savedCards);
+                if (Array.isArray(parsed)) {
+                    state.cards = parsed.filter(c => c && c.id && typeof c.id === 'string');
+                } else {
+                    state.cards = [];
+                }
             } catch(e) {
                 state.cards = [];
             }
@@ -222,6 +239,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function syncCardToCloud(card) {
+        if (!card || !card.id) return;
         saveLocalStorageBackup();
         
         if (isCloudOnline && db) {
@@ -339,10 +357,10 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // ----------------------------------------------------------------------
-    // 5. GUARD SCANNER CORE LOGIC (0.05S INSTANT RECOGNITION)
+    // 5. GUARD SCANNER CORE LOGIC (SAFE NULL-CHECKED DECODING & FARE DEDUCTION)
     // ----------------------------------------------------------------------
     function processGuardScan(rawText) {
-        if (!rawText) return;
+        if (!rawText || typeof rawText !== 'string') return;
 
         const now = Date.now();
         if (now - state.lastScanTime < 1500) return;
@@ -351,7 +369,10 @@ document.addEventListener('DOMContentLoaded', () => {
         const cardId = rawText.trim();
         console.log("🟢 QR Code Decoded:", cardId);
 
-        const card = state.cards.find(c => c.id.trim().toUpperCase() === cardId.toUpperCase());
+        // Safe null/undefined check for c.id before trim
+        const card = state.cards.find(c => 
+            c && c.id && typeof c.id === 'string' && c.id.trim().toUpperCase() === cardId.toUpperCase()
+        );
 
         if (!card) {
             triggerSignalResult(false, 'INVALID / UNREGISTERED QR 🔴', `QR Code "${cardId}" System DB Mein Register Nahi Hai!`);
@@ -466,7 +487,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // ----------------------------------------------------------------------
-    // 6. OPTIMIZED CAMERA SCANNER (10 FPS, FOCUSED 55% QR BOX & DEBUG LOGS)
+    // 6. CAMERA SCANNER ENGINE FOR GUARD & RECHARGE
     // ----------------------------------------------------------------------
     function startGuardCameraScanner() {
         if (typeof Html5Qrcode === 'undefined') return;
@@ -489,10 +510,7 @@ document.addEventListener('DOMContentLoaded', () => {
             { facingMode: "environment" },
             mobileConfig,
             (decodedText) => processGuardScan(decodedText),
-            (err) => {
-                // Console debug log for scan attempts
-                console.log("Scan decode notice:", err);
-            }
+            () => {}
         ).then(() => {
             state.scannerActive = true;
             document.getElementById('btn-start-camera').classList.add('hidden');
@@ -502,9 +520,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 { facingMode: "user" },
                 mobileConfig,
                 (decodedText) => processGuardScan(decodedText),
-                (err) => {
-                    console.log("Scan decode notice:", err);
-                }
+                () => {}
             ).then(() => {
                 state.scannerActive = true;
                 document.getElementById('btn-start-camera').classList.add('hidden');
@@ -549,9 +565,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 fetchCardForRecharge(decodedText);
                 playGrantedSound();
             },
-            (err) => {
-                console.log("Recharge scan notice:", err);
-            }
+            () => {}
         ).then(() => {
             state.rechargeScannerActive = true;
             document.getElementById('btn-recharge-camera-start').classList.add('hidden');
@@ -564,9 +578,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     fetchCardForRecharge(decodedText);
                     playGrantedSound();
                 },
-                (err) => {
-                    console.log("Recharge scan notice:", err);
-                }
+                () => {}
             ).then(() => {
                 state.rechargeScannerActive = true;
                 document.getElementById('btn-recharge-camera-start').classList.add('hidden');
@@ -586,15 +598,17 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // ----------------------------------------------------------------------
-    // 7. DEDICATED RECHARGE TOOL LOGIC
+    // 7. DEDICATED RECHARGE TOOL LOGIC (SAFE NULL-CHECKED FETCH)
     // ----------------------------------------------------------------------
     function fetchCardForRecharge(cardId) {
-        if (!cardId) {
+        if (!cardId || typeof cardId !== 'string') {
             document.getElementById('recharge-card-result').classList.add('hidden');
             return;
         }
 
-        const card = state.cards.find(c => c.id.toUpperCase() === cardId.trim().toUpperCase());
+        const card = state.cards.find(c => 
+            c && c.id && typeof c.id === 'string' && c.id.trim().toUpperCase() === cardId.trim().toUpperCase()
+        );
         const resultContainer = document.getElementById('recharge-card-result');
 
         if (!card) {
@@ -626,7 +640,7 @@ document.addEventListener('DOMContentLoaded', () => {
             return;
         }
 
-        const card = state.cards.find(c => c.id === state.rechargeTargetCardId);
+        const card = state.cards.find(c => c && c.id === state.rechargeTargetCardId);
         if (card) {
             const currentBal = typeof card.balance === 'number' ? card.balance : 0;
             card.balance = currentBal + amount;
@@ -667,7 +681,7 @@ document.addEventListener('DOMContentLoaded', () => {
         });
         document.getElementById('stat-total-revenue').textContent = `Rs. ${totalRevenue}`;
         
-        const inTransitCount = state.cards.filter(c => c.status === 'IN_TRANSIT').length;
+        const inTransitCount = state.cards.filter(c => c && c.status === 'IN_TRANSIT').length;
         document.getElementById('stat-in-transit').textContent = inTransitCount;
 
         // Recharge Select Dropdown
@@ -685,7 +699,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         // Update active target recharge card balance if currently visible
         if (state.rechargeTargetCardId && !document.getElementById('recharge-card-result').classList.contains('hidden')) {
-            const activeRechargeCard = state.cards.find(c => c.id === state.rechargeTargetCardId);
+            const activeRechargeCard = state.cards.find(c => c && c.id === state.rechargeTargetCardId);
             if (activeRechargeCard) {
                 const realBal = typeof activeRechargeCard.balance === 'number' ? activeRechargeCard.balance : 0;
                 document.getElementById('rc-balance').textContent = `Rs. ${realBal}`;
@@ -715,7 +729,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 }).join('');
 
                 state.cards.forEach(c => {
-                    generateQRCode(`gallery-qr-${c.id}`, c.id, 140);
+                    if (c && c.id) generateQRCode(`gallery-qr-${c.id}`, c.id, 140);
                 });
             }
         }
@@ -781,7 +795,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function displayCardPreview(cardId) {
-        const card = state.cards.find(c => c.id === cardId);
+        const card = state.cards.find(c => c && c.id === cardId);
         if (!card) {
             renderPlaceholderCardPreview();
             return;
@@ -899,7 +913,7 @@ document.addEventListener('DOMContentLoaded', () => {
             return;
         }
 
-        const card = state.cards.find(c => c.id === state.activeCardId);
+        const card = state.cards.find(c => c && c.id === state.activeCardId);
         if (!card) return;
 
         const bal = typeof card.balance === 'number' ? card.balance : 0;
