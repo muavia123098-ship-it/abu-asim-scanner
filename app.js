@@ -1,6 +1,6 @@
 /* ==========================================================================
    Karachi Green Line BRT - Smart QR Ticket & Reusable Card System
-   Dedicated Mobile & Tablet Rear-Camera Engine (Instant 0.05s Auto-Focus Scan)
+   Optimized Mobile Scanner: 10 FPS, Focused 55% QR Box & Debug Log Callback
    ========================================================================== */
 
 document.addEventListener('DOMContentLoaded', () => {
@@ -349,7 +349,7 @@ document.addEventListener('DOMContentLoaded', () => {
         state.lastScanTime = now;
 
         const cardId = rawText.trim();
-        console.log("🟢 Mobile QR Decoded:", cardId);
+        console.log("🟢 QR Code Decoded:", cardId);
 
         const card = state.cards.find(c => c.id.trim().toUpperCase() === cardId.toUpperCase());
 
@@ -466,7 +466,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // ----------------------------------------------------------------------
-    // 6. DEDICATED MOBILE & TABLET CAMERA SCANNER ENGINE
+    // 6. OPTIMIZED CAMERA SCANNER (10 FPS, FOCUSED 55% QR BOX & DEBUG LOGS)
     // ----------------------------------------------------------------------
     function startGuardCameraScanner() {
         if (typeof Html5Qrcode === 'undefined') return;
@@ -477,31 +477,34 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         const mobileConfig = {
-            fps: 25,
+            fps: 10,
             qrbox: (w, h) => {
                 const min = Math.min(w, h);
-                const size = Math.floor(min * 0.70);
-                return { width: Math.max(size, 200), height: Math.max(size, 200) };
+                const size = Math.floor(min * 0.55);
+                return { width: Math.max(size, 180), height: Math.max(size, 180) };
             }
         };
 
-        // Direct Mobile / Tablet Rear Camera Target
         html5QrCodeGuard.start(
             { facingMode: "environment" },
             mobileConfig,
             (decodedText) => processGuardScan(decodedText),
-            (err) => {}
+            (err) => {
+                // Console debug log for scan attempts
+                console.log("Scan decode notice:", err);
+            }
         ).then(() => {
             state.scannerActive = true;
             document.getElementById('btn-start-camera').classList.add('hidden');
             document.getElementById('btn-stop-camera').classList.remove('hidden');
         }).catch(err => {
-            // Tablet Front Camera Fallback
             html5QrCodeGuard.start(
                 { facingMode: "user" },
                 mobileConfig,
                 (decodedText) => processGuardScan(decodedText),
-                (err) => {}
+                (err) => {
+                    console.log("Scan decode notice:", err);
+                }
             ).then(() => {
                 state.scannerActive = true;
                 document.getElementById('btn-start-camera').classList.add('hidden');
@@ -531,11 +534,11 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         const mobileConfig = {
-            fps: 25,
+            fps: 10,
             qrbox: (w, h) => {
                 const min = Math.min(w, h);
-                const size = Math.floor(min * 0.70);
-                return { width: Math.max(size, 200), height: Math.max(size, 200) };
+                const size = Math.floor(min * 0.55);
+                return { width: Math.max(size, 180), height: Math.max(size, 180) };
             }
         };
 
@@ -546,7 +549,9 @@ document.addEventListener('DOMContentLoaded', () => {
                 fetchCardForRecharge(decodedText);
                 playGrantedSound();
             },
-            (err) => {}
+            (err) => {
+                console.log("Recharge scan notice:", err);
+            }
         ).then(() => {
             state.rechargeScannerActive = true;
             document.getElementById('btn-recharge-camera-start').classList.add('hidden');
@@ -559,7 +564,9 @@ document.addEventListener('DOMContentLoaded', () => {
                     fetchCardForRecharge(decodedText);
                     playGrantedSound();
                 },
-                (err) => {}
+                (err) => {
+                    console.log("Recharge scan notice:", err);
+                }
             ).then(() => {
                 state.rechargeScannerActive = true;
                 document.getElementById('btn-recharge-camera-start').classList.add('hidden');
