@@ -1,62 +1,57 @@
 /* ==========================================================================
    Karachi Green Line BRT - Smart QR Ticket & Reusable Card System
-   Native Browser Camera Permission Prompt & PWA Install Auto-Hide Fix
+   Bulletproof Mobile Camera Initialization & Resource Conflict Fix
    ========================================================================== */
 
 document.addEventListener('DOMContentLoaded', () => {
 
     // ----------------------------------------------------------------------
-    // 1. PWA INSTALL BUTTON HANDLER (PERMANENT AUTO-HIDE ONCE INSTALLED)
+    // 1. DYNAMIC PWA INSTALLATION HANDLER (NEVER SHOWS INSIDE INSTALLED APP)
     // ----------------------------------------------------------------------
     let deferredPrompt = null;
-    const btnInstallPwa = document.getElementById('btn-install-pwa');
 
     const isStandaloneMode = window.matchMedia('(display-mode: standalone)').matches || 
+                             window.matchMedia('(display-mode: minimal-ui)').matches ||
                              window.navigator.standalone === true || 
                              document.referrer.includes('android-app://');
 
-    // Auto-hide button if app is installed or recorded as installed
-    if (isStandaloneMode || localStorage.getItem('pwa_app_installed') === 'true') {
-        if (btnInstallPwa) {
-            btnInstallPwa.classList.add('hidden');
-            btnInstallPwa.style.display = 'none';
-        }
+    if (!isStandaloneMode && localStorage.getItem('pwa_app_installed') !== 'true') {
+        window.addEventListener('beforeinstallprompt', (e) => {
+            e.preventDefault();
+            deferredPrompt = e;
+            injectInstallButton();
+        });
     }
 
-    window.addEventListener('beforeinstallprompt', (e) => {
-        e.preventDefault();
-        deferredPrompt = e;
-        if (btnInstallPwa && !isStandaloneMode && localStorage.getItem('pwa_app_installed') !== 'true') {
-            btnInstallPwa.classList.remove('hidden');
-            btnInstallPwa.style.display = 'inline-flex';
-        }
-    });
+    function injectInstallButton() {
+        if (isStandaloneMode || localStorage.getItem('pwa_app_installed') === 'true') return;
+        if (document.getElementById('btn-install-pwa')) return;
 
-    if (btnInstallPwa) {
-        btnInstallPwa.addEventListener('click', async () => {
+        const headerActions = document.getElementById('header-right-actions');
+        if (!headerActions) return;
+
+        const btn = document.createElement('button');
+        btn.id = 'btn-install-pwa';
+        btn.className = 'btn btn-gold btn-install-app';
+        btn.innerHTML = '<i class="fa-solid fa-download"></i> 📲 App Install Karein';
+
+        btn.addEventListener('click', async () => {
+            localStorage.setItem('pwa_app_installed', 'true');
             if (deferredPrompt) {
                 deferredPrompt.prompt();
-                const { outcome } = await deferredPrompt.userChoice;
-                if (outcome === 'accepted') {
-                    localStorage.setItem('pwa_app_installed', 'true');
-                }
+                await deferredPrompt.userChoice;
                 deferredPrompt = null;
-                btnInstallPwa.classList.add('hidden');
-                btnInstallPwa.style.display = 'none';
-            } else {
-                localStorage.setItem('pwa_app_installed', 'true');
-                btnInstallPwa.classList.add('hidden');
-                btnInstallPwa.style.display = 'none';
             }
+            btn.remove();
         });
+
+        headerActions.prepend(btn);
     }
 
     window.addEventListener('appinstalled', () => {
         localStorage.setItem('pwa_app_installed', 'true');
-        if (btnInstallPwa) {
-            btnInstallPwa.classList.add('hidden');
-            btnInstallPwa.style.display = 'none';
-        }
+        const btn = document.getElementById('btn-install-pwa');
+        if (btn) btn.remove();
         console.log('🟢 PWA App Installed Successfully!');
     });
 
@@ -439,69 +434,54 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // ----------------------------------------------------------------------
-    // 6. NATIVE BROWSER CAMERA PERMISSION & FAST SCANNING ENGINE
+    // 6. BULLETPROOF MOBILE CAMERA INITIALIZATION (FAIL-SAFE & FALLBACKS)
     // ----------------------------------------------------------------------
-    async function startGuardCameraScanner() {
-        try {
-            // Explicitly request native browser camera permission prompt directly!
-            if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
-                const stream = await navigator.mediaDevices.getUserMedia({
-                    video: { facingMode: { ideal: "environment" } }
-                });
-                // Stop temporary track once permission is granted so Html5Qrcode can bind
-                stream.getTracks().forEach(track => track.stop());
-            }
+    function startGuardCameraScanner() {
+        if (typeof Html5Qrcode === 'undefined') return;
 
-            if (typeof Html5Qrcode === 'undefined') return;
+        if (state.scannerActive) return;
 
-            if (!html5QrCodeGuard) {
-                html5QrCodeGuard = new Html5Qrcode("reader", {
-                    experimentalFeatures: {
-                        useBarCodeDetectorIfSupported: true
-                    }
-                });
-            }
+        if (!html5QrCodeGuard) {
+            html5QrCodeGuard = new Html5Qrcode("reader", {
+                experimentalFeatures: {
+                    useBarCodeDetectorIfSupported: true
+                }
+            });
+        }
 
-            const cameraConfig = {
-                fps: 40,
-                disableFlip: false
-            };
+        const config = {
+            fps: 30,
+            disableFlip: false
+        };
 
-            const videoConstraints = {
-                facingMode: "environment",
-                width: { ideal: 1280 },
-                height: { ideal: 720 },
-                focusMode: { ideal: "continuous" }
-            };
-
-            await html5QrCodeGuard.start(
-                videoConstraints,
-                cameraConfig,
-                (decodedText) => processGuardScan(decodedText),
-                (err) => {}
-            );
-
+        // Directly start environment camera without prior getUserMedia lock
+        html5QrCodeGuard.start(
+            { facingMode: "environment" },
+            config,
+            (decodedText) => processGuardScan(decodedText),
+            (err) => {}
+        ).then(() => {
             state.scannerActive = true;
             document.getElementById('btn-start-camera').classList.add('hidden');
             document.getElementById('btn-stop-camera').classList.remove('hidden');
-
-            try {
-                const track = html5QrCodeGuard.getRunningTrackCapabilities();
-                if (track && track.focusMode && track.focusMode.includes('continuous')) {
-                    html5QrCodeGuard.applyVideoConstraints({
-                        advanced: [{ focusMode: 'continuous' }]
-                    }).catch(e => {});
-                }
-            } catch(e) {}
-
-        } catch (err) {
-            console.error("Camera getUserMedia error:", err);
-            if (err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError') {
-                alert('🎥 CAMERA PERMISSION BLOCKED!\n\nBrowser Address Bar par bana LOCK 🔒 / TUNE icon click karke Camera Permission Ko "ALLOW" karein aur page reload karein.');
-            } else {
-                alert(`Camera Settings Alert: Browser me Camera permission allow karein (${err.message || 'Not Allowed'})`);
-            }
-        }
+        }).catch(err => {
+            console.warn("Environment camera start error, trying default camera:", err);
+            
+            // Fallback 1: Try default video device
+            html5QrCodeGuard.start(
+                { facingMode: "user" },
+                config,
+                (decodedText) => processGuardScan(decodedText),
+                (err) => {}
+            ).then(() => {
+                state.scannerActive = true;
+                document.getElementById('btn-start-camera').classList.add('hidden');
+                document.getElementById('btn-stop-camera').classList.remove('hidden');
+            }).catch(fallbackErr => {
+                console.error("All camera start attempts failed:", fallbackErr);
+                alert("🎥 Camera Open Alert:\n\nChrome Browser mein Lock 🔒 icon dabayein -> Camera Permission ko RESET/ALLOW karke page reload karein!");
+            });
+        });
     }
 
     function stopGuardCameraScanner() {
@@ -514,55 +494,51 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-    async function startRechargeCameraScanner() {
-        try {
-            if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
-                const stream = await navigator.mediaDevices.getUserMedia({
-                    video: { facingMode: { ideal: "environment" } }
-                });
-                stream.getTracks().forEach(track => track.stop());
-            }
+    function startRechargeCameraScanner() {
+        if (typeof Html5Qrcode === 'undefined') return;
 
-            if (typeof Html5Qrcode === 'undefined') return;
+        if (state.rechargeScannerActive) return;
 
-            if (!html5QrCodeRecharge) {
-                html5QrCodeRecharge = new Html5Qrcode("recharge-reader", {
-                    experimentalFeatures: {
-                        useBarCodeDetectorIfSupported: true
-                    }
-                });
-            }
+        if (!html5QrCodeRecharge) {
+            html5QrCodeRecharge = new Html5Qrcode("recharge-reader", {
+                experimentalFeatures: {
+                    useBarCodeDetectorIfSupported: true
+                }
+            });
+        }
 
-            const cameraConfig = {
-                fps: 40,
-                disableFlip: false
-            };
+        const config = {
+            fps: 30,
+            disableFlip: false
+        };
 
-            const videoConstraints = {
-                facingMode: "environment",
-                width: { ideal: 1280 },
-                height: { ideal: 720 },
-                focusMode: { ideal: "continuous" }
-            };
-
-            await html5QrCodeRecharge.start(
-                videoConstraints,
-                cameraConfig,
+        html5QrCodeRecharge.start(
+            { facingMode: "environment" },
+            config,
+            (decodedText) => {
+                fetchCardForRecharge(decodedText);
+                playGrantedSound();
+            },
+            (err) => {}
+        ).then(() => {
+            state.rechargeScannerActive = true;
+            document.getElementById('btn-recharge-camera-start').classList.add('hidden');
+            document.getElementById('btn-recharge-camera-stop').classList.remove('hidden');
+        }).catch(err => {
+            html5QrCodeRecharge.start(
+                { facingMode: "user" },
+                config,
                 (decodedText) => {
                     fetchCardForRecharge(decodedText);
                     playGrantedSound();
                 },
                 (err) => {}
-            );
-
-            state.rechargeScannerActive = true;
-            document.getElementById('btn-recharge-camera-start').classList.add('hidden');
-            document.getElementById('btn-recharge-camera-stop').classList.remove('hidden');
-
-        } catch (err) {
-            console.error("Recharge Camera Error:", err);
-            alert('🎥 Browser Address Bar ke LOCK 🔒 icon se Camera Allow karein.');
-        }
+            ).then(() => {
+                state.rechargeScannerActive = true;
+                document.getElementById('btn-recharge-camera-start').classList.add('hidden');
+                document.getElementById('btn-recharge-camera-stop').classList.remove('hidden');
+            }).catch(e => alert("🎥 Browser settings se Camera ALLOW karein."));
+        });
     }
 
     function stopRechargeCameraScanner() {
@@ -905,7 +881,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     <div>
                         <h3 style="margin:0; font-size:18px;">${card.name}</h3>
                         <p style="margin:4px 0; font-size:12px; color:#aaa;">Card ID: <b>${card.id}</b></p>
-                        <p style="margin:2px 0; font-size:12px; color:#aaa;">Phone: ${card.phone}</p>
+                        <p style="margin:4px 0; font-size:12px; color:#aaa;">Phone: ${card.phone}</p>
                         <div style="margin-top:8px; background:rgba(0,230,118,0.2); color:#00e676; padding:4px 8px; border-radius:6px; font-weight:bold; font-size:13px; display:inline-block;">
                             INITIAL BALANCE: Rs. ${bal}
                         </div>

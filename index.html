@@ -48,11 +48,8 @@
                 </div>
             </div>
             
-            <div class="header-right-actions">
-                <!-- PWA Mobile Install App Button (Hidden by default) -->
-                <button id="btn-install-pwa" class="btn btn-gold btn-install-app hidden" style="display: none;">
-                    <i class="fa-solid fa-download"></i> 📲 App Install Karein
-                </button>
+            <div class="header-right-actions" id="header-right-actions">
+                <!-- PWA Install button will ONLY be injected dynamically by JS if NOT in installed standalone app mode -->
 
                 <div class="mode-switch-container">
                     <button id="btn-guard-mode" class="mode-btn active">
