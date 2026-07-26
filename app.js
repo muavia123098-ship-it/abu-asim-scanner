@@ -1,11 +1,6 @@
 /* ==========================================================================
    Karachi Green Line BRT - Smart QR Ticket & Reusable Card System
-   ⚡ LIGHTNING FAST FULL-FRAME SCANNING ENGINE (0.1s INSTANT DETECTION)
-   Features:
-   - Full Video Stream Scanning (No small square border restrictions)
-   - Continuous Camera Auto-Focus API Engine
-   - 40 FPS High-Frequency Pixel Sampling
-   - Angle-Independent Any-Corner Instant Scan
+   PWA Installation Handler (Auto-hides button when app is installed / standalone)
    ========================================================================== */
 
 document.addEventListener('DOMContentLoaded', () => {
@@ -16,10 +11,22 @@ document.addEventListener('DOMContentLoaded', () => {
     let deferredPrompt = null;
     const btnInstallPwa = document.getElementById('btn-install-pwa');
 
+    // Check if app is already running in standalone mode (Installed PWA) or recorded in localStorage
+    const isStandaloneMode = window.matchMedia('(display-mode: standalone)').matches || 
+                             window.navigator.standalone === true || 
+                             document.referrer.includes('android-app://');
+
+    if (isStandaloneMode || localStorage.getItem('pwa_app_installed') === 'true') {
+        if (btnInstallPwa) btnInstallPwa.classList.add('hidden');
+    }
+
     window.addEventListener('beforeinstallprompt', (e) => {
         e.preventDefault();
         deferredPrompt = e;
-        if (btnInstallPwa) btnInstallPwa.classList.remove('hidden');
+        // Only show install button if app is NOT in standalone mode and NOT recorded as installed
+        if (btnInstallPwa && !isStandaloneMode && localStorage.getItem('pwa_app_installed') !== 'true') {
+            btnInstallPwa.classList.remove('hidden');
+        }
     });
 
     if (btnInstallPwa) {
@@ -27,13 +34,23 @@ document.addEventListener('DOMContentLoaded', () => {
             if (deferredPrompt) {
                 deferredPrompt.prompt();
                 const { outcome } = await deferredPrompt.userChoice;
+                if (outcome === 'accepted') {
+                    localStorage.setItem('pwa_app_installed', 'true');
+                }
                 deferredPrompt = null;
                 btnInstallPwa.classList.add('hidden');
             } else {
-                alert('📲 App Install Tips:\n• Chrome: Menu -> "Add to Home screen"\n• Safari: Share -> "Add to Home Screen"');
+                localStorage.setItem('pwa_app_installed', 'true');
+                btnInstallPwa.classList.add('hidden');
             }
         });
     }
+
+    window.addEventListener('appinstalled', () => {
+        localStorage.setItem('pwa_app_installed', 'true');
+        if (btnInstallPwa) btnInstallPwa.classList.add('hidden');
+        console.log('🟢 PWA App Installed Successfully!');
+    });
 
     let audioCtx = null;
     function getAudioContext() {
@@ -294,7 +311,6 @@ document.addEventListener('DOMContentLoaded', () => {
         if (!rawText) return;
 
         const now = Date.now();
-        // Reduced debounce timer to 600ms for instant consecutive scans
         if (now - state.lastScanTime < 600) return;
         state.lastScanTime = now;
 
@@ -415,7 +431,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // ----------------------------------------------------------------------
-    // 6. LIGHTNING-FAST CAMERA ENGINE (FULL FRAME 40 FPS & AUTO-FOCUS)
+    // 6. LIGHTNING-FAST CAMERA ENGINE
     // ----------------------------------------------------------------------
     function startGuardCameraScanner() {
         if (typeof Html5Qrcode === 'undefined') return;
@@ -428,13 +444,11 @@ document.addEventListener('DOMContentLoaded', () => {
             });
         }
 
-        // FULL FRAME CONFIGURATION (No restrictive bounding box box - scans entire video stream)
         const cameraConfig = {
-            fps: 40, // 40 FPS ultra-high sampling
+            fps: 40,
             disableFlip: false
         };
 
-        // Advanced camera track constraints for Continuous Auto-Focus & HD Resolution
         const videoConstraints = {
             facingMode: "environment",
             width: { ideal: 1280 },
@@ -452,7 +466,6 @@ document.addEventListener('DOMContentLoaded', () => {
             document.getElementById('btn-start-camera').classList.add('hidden');
             document.getElementById('btn-stop-camera').classList.remove('hidden');
 
-            // Apply Continuous Auto-Focus to camera track if supported by phone/tablet
             try {
                 const track = html5QrCodeGuard.getRunningTrackCapabilities();
                 if (track && track.focusMode && track.focusMode.includes('continuous')) {

@@ -1,7 +1,7 @@
 /* ==========================================================================
    Karachi Green Line BRT - Smart QR Ticket & Reusable Card System
    Theme: Vibrant Emerald Green, Deep Slate Navy, Glassmorphism, Signal Red/Green
-   Full-Frame Any-Angle Lightning-Fast Camera Scanning Engine
+   Strict Mobile Responsive Overrides (Vertical Admin Menu & Zero Horizontal Zoom)
    ========================================================================== */
 
 :root {
@@ -32,16 +32,14 @@
     touch-action: manipulation;
 }
 
-body {
+html, body {
     background-color: var(--bg-dark);
     color: var(--text-main);
     min-height: 100vh;
-    display: flex;
-    justify-content: center;
-    align-items: flex-start;
-    padding: 0;
-    line-height: 1.5;
+    width: 100%;
+    max-width: 100vw;
     overflow-x: hidden;
+    line-height: 1.5;
 }
 
 .app-container {
@@ -52,6 +50,7 @@ body {
     min-height: 100vh;
     display: flex;
     flex-direction: column;
+    overflow-x: hidden;
 }
 
 .printable-area {
@@ -164,6 +163,7 @@ body {
     display: flex;
     flex-direction: column;
     gap: 16px;
+    width: 100%;
 }
 
 .view-section.hidden {
@@ -268,7 +268,6 @@ body {
     gap: 14px;
 }
 
-/* FULL-FRAME ANY-ANGLE CAMERA PREVIEW WRAPPER */
 .scanner-frame-wrapper {
     position: relative;
     width: 100%;
@@ -294,14 +293,28 @@ body {
     border: none !important;
 }
 
-/* Hardware Sharpening & High Contrast Video Stream Filter */
+#qr-shaded-region,
+#reader__scan_region img,
+#reader__dashboard,
+#recharge-reader__scan_region img,
+#recharge-reader__dashboard,
+#reader div[style*="border"],
+#recharge-reader div[style*="border"] {
+    display: none !important;
+    opacity: 0 !important;
+    visibility: hidden !important;
+    width: 0 !important;
+    height: 0 !important;
+}
+
 #reader video, #recharge-reader video {
+    width: 100% !important;
+    height: 100% !important;
     object-fit: cover !important;
     filter: contrast(135%) brightness(108%) saturate(120%);
     image-rendering: pixelated;
 }
 
-/* Full Width Laser Sweep Line across the entire video feed */
 .scan-laser {
     position: absolute;
     top: 0;
@@ -446,6 +459,7 @@ body {
     grid-template-columns: 230px 1fr;
     gap: 18px;
     min-height: 500px;
+    width: 100%;
 }
 
 .admin-sidebar {
@@ -456,6 +470,7 @@ body {
     display: flex;
     flex-direction: column;
     gap: 12px;
+    width: 100%;
 }
 
 .sidebar-header {
@@ -470,7 +485,12 @@ body {
     gap: 6px;
 }
 
-.sidebar-menu { display: flex; flex-direction: column; gap: 6px; }
+.sidebar-menu {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    width: 100%;
+}
 
 .nav-item {
     background: transparent;
@@ -487,6 +507,7 @@ body {
     gap: 10px;
     text-align: left;
     white-space: nowrap;
+    width: 100%;
 }
 
 .nav-item:hover { background: rgba(255, 255, 255, 0.05); color: #fff; }
@@ -497,8 +518,21 @@ body {
     font-weight: 700;
 }
 
-.admin-content { display: flex; flex-direction: column; gap: 16px; }
-.tab-page { display: flex; flex-direction: column; gap: 16px; }
+.admin-content {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    width: 100%;
+    min-width: 0;
+}
+
+.tab-page {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    width: 100%;
+}
+
 .tab-page.hidden { display: none !important; }
 
 /* CHANGE PIN CARD BOX */
@@ -511,6 +545,7 @@ body {
     flex-direction: column;
     gap: 14px;
     max-width: 480px;
+    width: 100%;
 }
 
 .change-pin-box h2 { font-size: 1.1rem; color: var(--primary-green); display: flex; align-items: center; gap: 8px; }
@@ -521,6 +556,7 @@ body {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
     gap: 12px;
+    width: 100%;
 }
 
 .stat-card {
@@ -531,6 +567,7 @@ body {
     display: flex;
     align-items: center;
     gap: 12px;
+    width: 100%;
 }
 
 .stat-icon {
@@ -553,8 +590,9 @@ body {
 
 .issue-page-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
     gap: 16px;
+    width: 100%;
 }
 
 .card-form-box {
@@ -565,10 +603,11 @@ body {
     display: flex;
     flex-direction: column;
     gap: 14px;
+    width: 100%;
 }
 
 .card-form-box h2 { font-size: 1rem; color: #fff; display: flex; align-items: center; gap: 8px; }
-.form-group { display: flex; flex-direction: column; gap: 5px; }
+.form-group { display: flex; flex-direction: column; gap: 5px; width: 100%; }
 .form-group.flex-1 { flex: 1; }
 .form-group label { font-size: 0.8rem; font-weight: 600; color: var(--text-muted); }
 .form-group input, .select-input {
@@ -579,6 +618,7 @@ body {
     color: #fff;
     font-size: 16px;
     outline: none;
+    width: 100%;
 }
 
 .form-group input:focus, .select-input:focus {
@@ -598,6 +638,7 @@ body {
     flex-direction: column;
     gap: 14px;
     align-items: center;
+    width: 100%;
 }
 
 .smart-pvc-card {
@@ -688,6 +729,7 @@ body {
     display: flex;
     flex-direction: column;
     gap: 14px;
+    width: 100%;
 }
 
 .recharge-tool-box h2 { font-size: 1.15rem; color: var(--gold); display: flex; align-items: center; gap: 8px; }
@@ -707,8 +749,8 @@ body {
     width: 100%;
 }
 
-.recharge-select-row { display: flex; gap: 12px; flex-wrap: wrap; }
-.input-with-btn { display: flex; gap: 8px; }
+.recharge-select-row { display: flex; gap: 12px; flex-wrap: wrap; width: 100%; }
+.input-with-btn { display: flex; gap: 8px; width: 100%; }
 .input-with-btn input { flex: 1; }
 
 .recharge-card-result {
@@ -719,6 +761,7 @@ body {
     display: flex;
     flex-direction: column;
     gap: 14px;
+    width: 100%;
 }
 
 .recharge-card-result.hidden { display: none !important; }
@@ -741,6 +784,7 @@ body {
     display: flex;
     flex-direction: column;
     gap: 12px;
+    width: 100%;
 }
 
 .qr-gallery-section h2 { font-size: 1.05rem; color: var(--gold); display: flex; align-items: center; gap: 8px; }
@@ -748,8 +792,9 @@ body {
 
 .qr-gallery-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+    grid-template-columns: repeat(auto-fill, minmax(170px, 1fr));
     gap: 14px;
+    width: 100%;
 }
 
 .gallery-card-item {
@@ -800,9 +845,15 @@ body {
     display: flex;
     flex-direction: column;
     gap: 12px;
+    width: 100%;
+    overflow: hidden;
 }
 
-.table-responsive { overflow-x: auto; }
+.table-responsive {
+    width: 100%;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+}
 
 .data-table {
     width: 100%;
@@ -919,8 +970,16 @@ body {
 .modal-buttons { display: flex; gap: 10px; width: 100%; }
 .modal-buttons .btn { flex: 1; }
 
-/* MOBILE RESPONSIVE OVERRIDES */
+/* ==========================================
+   STRICT MOBILE RESPONSIVE OVERRIDES (VERTICAL MENU & NO HORIZONTAL ZOOM)
+   ========================================== */
 @media (max-width: 768px) {
+    html, body, .app-container, .admin-layout, .admin-content, .tab-page {
+        max-width: 100vw !important;
+        overflow-x: hidden !important;
+        box-sizing: border-box !important;
+    }
+
     input, select, textarea, button {
         font-size: 16px !important;
     }
@@ -950,69 +1009,74 @@ body {
     }
 
     .admin-layout {
-        grid-template-columns: 1fr;
-        gap: 14px;
+        display: flex !important;
+        flex-direction: column !important;
+        gap: 14px !important;
+        width: 100% !important;
     }
 
     .admin-sidebar {
-        padding: 12px;
+        padding: 12px !important;
+        width: 100% !important;
     }
 
+    /* VERTICAL ADMIN MENU (ONE ITEM PER ROW ON MOBILE) */
     .sidebar-menu {
-        display: grid;
-        grid-template-columns: 1fr 1fr;
-        gap: 8px;
+        display: flex !important;
+        flex-direction: column !important;
+        gap: 6px !important;
+        width: 100% !important;
     }
 
     .nav-item {
-        justify-content: center;
-        padding: 10px 8px;
-        font-size: 0.8rem !important;
-        text-align: center;
+        width: 100% !important;
+        justify-content: flex-start !important;
+        padding: 12px 14px !important;
+        font-size: 0.88rem !important;
+        text-align: left !important;
+        white-space: normal !important;
+        word-break: break-word !important;
     }
 
     .stats-grid {
-        grid-template-columns: 1fr 1fr;
-        gap: 10px;
+        grid-template-columns: 1fr !important;
+        gap: 10px !important;
     }
 
     .stat-card {
-        padding: 12px;
-        gap: 10px;
+        padding: 12px !important;
+        gap: 10px !important;
+        width: 100% !important;
     }
 
     .stat-icon {
-        width: 38px;
-        height: 38px;
-        font-size: 1.1rem;
+        width: 38px !important;
+        height: 38px !important;
+        font-size: 1.1rem !important;
     }
 
     .stat-data h3 {
-        font-size: 1.1rem;
+        font-size: 1.1rem !important;
     }
 
     .recharge-select-row {
-        flex-direction: column;
-        gap: 10px;
+        flex-direction: column !important;
+        gap: 10px !important;
     }
 }
 
 @media (max-width: 480px) {
     .stats-grid {
-        grid-template-columns: 1fr;
-    }
-
-    .sidebar-menu {
-        grid-template-columns: 1fr 1fr;
+        grid-template-columns: 1fr !important;
     }
 
     .smart-pvc-card {
-        padding: 12px;
-        min-height: 200px;
+        padding: 12px !important;
+        min-height: 200px !important;
     }
 
     .card-info h3 {
-        font-size: 1rem;
+        font-size: 1rem !important;
     }
 
     #preview-qr-code canvas, #preview-qr-code img {
