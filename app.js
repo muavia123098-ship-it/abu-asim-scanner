@@ -1,6 +1,6 @@
 /* ==========================================================================
    Karachi Green Line BRT - Smart QR Ticket & Reusable Card System
-   High-DPI Water-Bubble Liquid Drop QR Generator (Zero Artifacts / Ultra HD)
+   Complete Core JS Engine + All UI Event Listeners Restored
    ========================================================================== */
 
 document.addEventListener('DOMContentLoaded', () => {
@@ -385,13 +385,13 @@ document.addEventListener('DOMContentLoaded', () => {
 
         if (typeof QRCodeStyling !== 'undefined') {
             const qrCode = new QRCodeStyling({
-                width: 400, // Render at 400px High-DPI to completely eliminate thin line subpixel artifacts
+                width: 400,
                 height: 400,
                 type: "canvas",
                 data: textData,
                 dotsOptions: {
                     color: "#08152b",
-                    type: "rounded" // Water-Bubble Liquid Drop style (iPhone Glass aesthetics)
+                    type: "rounded"
                 },
                 backgroundOptions: {
                     color: "#ffffff"
@@ -513,6 +513,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const msgEl = document.getElementById('signal-msg');
         const infoEl = document.getElementById('signal-card-info');
 
+        if (!overlay) return;
         overlay.className = 'signal-overlay';
 
         if (isSuccess) {
@@ -591,8 +592,10 @@ document.addEventListener('DOMContentLoaded', () => {
             () => {}
         ).then(() => {
             state.scannerActive = true;
-            document.getElementById('btn-start-camera').classList.add('hidden');
-            document.getElementById('btn-stop-camera').classList.remove('hidden');
+            const btnStart = document.getElementById('btn-start-camera');
+            const btnStop = document.getElementById('btn-stop-camera');
+            if (btnStart) btnStart.classList.add('hidden');
+            if (btnStop) btnStop.classList.remove('hidden');
         }).catch(err => {
             html5QrCodeGuard.start(
                 { facingMode: "user" },
@@ -601,8 +604,10 @@ document.addEventListener('DOMContentLoaded', () => {
                 () => {}
             ).then(() => {
                 state.scannerActive = true;
-                document.getElementById('btn-start-camera').classList.add('hidden');
-                document.getElementById('btn-stop-camera').classList.remove('hidden');
+                const btnStart = document.getElementById('btn-start-camera');
+                const btnStop = document.getElementById('btn-stop-camera');
+                if (btnStart) btnStart.classList.add('hidden');
+                if (btnStop) btnStop.classList.remove('hidden');
             }).catch(e => {
                 alert("🎥 Mobile Camera Permission Allow Karein.");
             });
@@ -613,8 +618,10 @@ document.addEventListener('DOMContentLoaded', () => {
         if (html5QrCodeGuard && state.scannerActive) {
             html5QrCodeGuard.stop().then(() => {
                 state.scannerActive = false;
-                document.getElementById('btn-start-camera').classList.remove('hidden');
-                document.getElementById('btn-stop-camera').classList.add('hidden');
+                const btnStart = document.getElementById('btn-start-camera');
+                const btnStop = document.getElementById('btn-stop-camera');
+                if (btnStart) btnStart.classList.remove('hidden');
+                if (btnStop) btnStop.classList.add('hidden');
             }).catch(err => {});
         }
     }
@@ -649,8 +656,10 @@ document.addEventListener('DOMContentLoaded', () => {
             () => {}
         ).then(() => {
             state.rechargeScannerActive = true;
-            document.getElementById('btn-recharge-camera-start').classList.add('hidden');
-            document.getElementById('btn-recharge-camera-stop').classList.remove('hidden');
+            const btnStart = document.getElementById('btn-recharge-camera-start');
+            const btnStop = document.getElementById('btn-recharge-camera-stop');
+            if (btnStart) btnStart.classList.add('hidden');
+            if (btnStop) btnStop.classList.remove('hidden');
         }).catch(err => {
             html5QrCodeRecharge.start(
                 { facingMode: "user" },
@@ -662,8 +671,10 @@ document.addEventListener('DOMContentLoaded', () => {
                 () => {}
             ).then(() => {
                 state.rechargeScannerActive = true;
-                document.getElementById('btn-recharge-camera-start').classList.add('hidden');
-                document.getElementById('btn-recharge-camera-stop').classList.remove('hidden');
+                const btnStart = document.getElementById('btn-recharge-camera-start');
+                const btnStop = document.getElementById('btn-recharge-camera-stop');
+                if (btnStart) btnStart.classList.add('hidden');
+                if (btnStop) btnStop.classList.remove('hidden');
             }).catch(e => alert("🎥 Mobile Camera Allow Karein."));
         });
     }
@@ -672,8 +683,10 @@ document.addEventListener('DOMContentLoaded', () => {
         if (html5QrCodeRecharge && state.rechargeScannerActive) {
             html5QrCodeRecharge.stop().then(() => {
                 state.rechargeScannerActive = false;
-                document.getElementById('btn-recharge-camera-start').classList.remove('hidden');
-                document.getElementById('btn-recharge-camera-stop').classList.add('hidden');
+                const btnStart = document.getElementById('btn-recharge-camera-start');
+                const btnStop = document.getElementById('btn-recharge-camera-stop');
+                if (btnStart) btnStart.classList.remove('hidden');
+                if (btnStop) btnStop.classList.add('hidden');
             }).catch(err => {});
         }
     }
@@ -683,7 +696,8 @@ document.addEventListener('DOMContentLoaded', () => {
     // ----------------------------------------------------------------------
     function fetchCardForRecharge(cardId) {
         if (!cardId || typeof cardId !== 'string') {
-            document.getElementById('recharge-card-result').classList.add('hidden');
+            const resContainer = document.getElementById('recharge-card-result');
+            if (resContainer) resContainer.classList.add('hidden');
             return;
         }
 
@@ -694,7 +708,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         if (!card) {
             alert(`❌ Card ID "${cardId}" System Database Mein Nahi Mil Saka!`);
-            resultContainer.classList.add('hidden');
+            if (resultContainer) resultContainer.classList.add('hidden');
             return;
         }
 
@@ -702,68 +716,84 @@ document.addEventListener('DOMContentLoaded', () => {
 
         const realBal = typeof card.balance === 'number' ? card.balance : 0;
 
-        document.getElementById('rc-name').textContent = card.name;
-        document.getElementById('rc-id').textContent = card.id;
-        document.getElementById('rc-phone').textContent = card.phone;
-        document.getElementById('rc-balance').textContent = `Rs. ${realBal}`;
+        if (document.getElementById('rc-name')) document.getElementById('rc-name').textContent = card.name;
+        if (document.getElementById('rc-id')) document.getElementById('rc-id').textContent = card.id;
+        if (document.getElementById('rc-phone')) document.getElementById('rc-phone').textContent = card.phone;
+        if (document.getElementById('rc-balance')) document.getElementById('rc-balance').textContent = `Rs. ${realBal}`;
 
-        resultContainer.classList.remove('hidden');
+        if (resultContainer) resultContainer.classList.remove('hidden');
     }
 
-    document.getElementById('btn-confirm-recharge').addEventListener('click', () => {
-        if (!state.rechargeTargetCardId) return;
+    const btnConfirmRecharge = document.getElementById('btn-confirm-recharge');
+    if (btnConfirmRecharge) {
+        btnConfirmRecharge.addEventListener('click', () => {
+            if (!state.rechargeTargetCardId) return;
 
-        const amountInput = document.getElementById('recharge-amount-input');
-        const amount = parseFloat(amountInput.value);
+            const amountInput = document.getElementById('recharge-amount-input');
+            const amount = parseFloat(amountInput.value);
 
-        if (isNaN(amount) || amount <= 0) {
-            alert('Sahi Recharge Amount enter karein.');
-            return;
-        }
+            if (isNaN(amount) || amount <= 0) {
+                alert('Sahi Recharge Amount enter karein.');
+                return;
+            }
 
-        const card = state.cards.find(c => c && c.id === state.rechargeTargetCardId);
-        if (card) {
-            const currentBal = typeof card.balance === 'number' ? card.balance : 0;
-            card.balance = currentBal + amount;
-            card.initialBalance = (card.initialBalance || 0) + amount;
-            
-            syncCardToCloud(card);
-            playGrantedSound();
+            const card = state.cards.find(c => c && c.id === state.rechargeTargetCardId);
+            if (card) {
+                const currentBal = typeof card.balance === 'number' ? card.balance : 0;
+                card.balance = currentBal + amount;
+                card.initialBalance = (card.initialBalance || 0) + amount;
+                
+                syncCardToCloud(card);
+                playGrantedSound();
 
-            document.getElementById('rc-balance').textContent = `Rs. ${card.balance}`;
-            alert(`⚡ RECHARGE SUCCESSFUL!\nPassenger: ${card.name}\nNaya Balance: Rs. ${card.balance}`);
-        }
-    });
+                if (document.getElementById('rc-balance')) document.getElementById('rc-balance').textContent = `Rs. ${card.balance}`;
+                alert(`⚡ RECHARGE SUCCESSFUL!\nPassenger: ${card.name}\nNaya Balance: Rs. ${card.balance}`);
+            }
+        });
+    }
 
-    document.getElementById('btn-recharge-search-id').addEventListener('click', () => {
-        const idVal = document.getElementById('recharge-search-id').value;
-        if (idVal) fetchCardForRecharge(idVal);
-    });
+    const btnSearchRechargeId = document.getElementById('btn-recharge-search-id');
+    if (btnSearchRechargeId) {
+        btnSearchRechargeId.addEventListener('click', () => {
+            const idVal = document.getElementById('recharge-search-id').value;
+            if (idVal) fetchCardForRecharge(idVal);
+        });
+    }
 
-    document.getElementById('recharge-select-card').addEventListener('change', (e) => {
-        if (e.target.value) {
-            fetchCardForRecharge(e.target.value);
-        } else {
-            document.getElementById('recharge-card-result').classList.add('hidden');
-        }
-    });
+    const selectRechargeCard = document.getElementById('recharge-select-card');
+    if (selectRechargeCard) {
+        selectRechargeCard.addEventListener('change', (e) => {
+            if (e.target.value) {
+                fetchCardForRecharge(e.target.value);
+            } else {
+                const resContainer = document.getElementById('recharge-card-result');
+                if (resContainer) resContainer.classList.add('hidden');
+            }
+        });
+    }
 
     // ----------------------------------------------------------------------
     // 8. UI RENDER & SIDEBAR ROUTER
     // ----------------------------------------------------------------------
     function renderApp() {
         // Stats
-        document.getElementById('stat-total-cards').textContent = state.cards.length;
+        if (document.getElementById('stat-total-cards')) {
+            document.getElementById('stat-total-cards').textContent = state.cards.length;
+        }
         
         let totalRevenue = 0;
         state.cards.forEach(c => {
             const val = typeof c.initialBalance === 'number' ? c.initialBalance : c.balance;
             totalRevenue += (typeof val === 'number' ? val : 0);
         });
-        document.getElementById('stat-total-revenue').textContent = `Rs. ${totalRevenue}`;
+        if (document.getElementById('stat-total-revenue')) {
+            document.getElementById('stat-total-revenue').textContent = `Rs. ${totalRevenue}`;
+        }
         
         const inTransitCount = state.cards.filter(c => c && c.status === 'IN_TRANSIT').length;
-        document.getElementById('stat-in-transit').textContent = inTransitCount;
+        if (document.getElementById('stat-in-transit')) {
+            document.getElementById('stat-in-transit').textContent = inTransitCount;
+        }
 
         // Recharge Select Dropdown
         const rechargeSelect = document.getElementById('recharge-select-card');
@@ -779,11 +809,14 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         // Update active target recharge card balance if currently visible
-        if (state.rechargeTargetCardId && !document.getElementById('recharge-card-result').classList.contains('hidden')) {
+        const rcResultBox = document.getElementById('recharge-card-result');
+        if (state.rechargeTargetCardId && rcResultBox && !rcResultBox.classList.contains('hidden')) {
             const activeRechargeCard = state.cards.find(c => c && c.id === state.rechargeTargetCardId);
             if (activeRechargeCard) {
                 const realBal = typeof activeRechargeCard.balance === 'number' ? activeRechargeCard.balance : 0;
-                document.getElementById('rc-balance').textContent = `Rs. ${realBal}`;
+                if (document.getElementById('rc-balance')) {
+                    document.getElementById('rc-balance').textContent = `Rs. ${realBal}`;
+                }
             }
         }
 
@@ -850,7 +883,7 @@ document.addEventListener('DOMContentLoaded', () => {
                                 <button class="btn btn-outline btn-view-card" data-card-id="${c.id}" style="padding:4px 10px; font-size:0.75rem;">
                                     <i class="fa-solid fa-qrcode"></i> View
                                 </button>
-                                <button class="btn btn-outline btn-delete-card" data-card-id="${c.id}" style="padding:4px 8px; font-size:0.75rem; color:#ff1744; border-color:rgba(255,23,68,0.4); margin-left:4px;">
+                                <button class="btn btn-outline btn-delete-card" data-card-id="${c.id}" style="padding:4px 10px; font-size:0.75rem; color:#ff1744; border-color:rgba(255,23,68,0.4); margin-left:4px;">
                                     <i class="fa-solid fa-trash"></i> Delete
                                 </button>
                             </td>
@@ -884,12 +917,14 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function renderPlaceholderCardPreview() {
-        document.getElementById('preview-user-name').textContent = 'Naya Card Select/Issue Karein';
-        document.getElementById('preview-card-id').textContent = 'GL-CARD-XXXX';
-        document.getElementById('preview-card-phone').textContent = '03XX-XXXXXXX';
-        document.getElementById('preview-card-balance').textContent = 'Rs. 0';
-        document.getElementById('preview-card-status').textContent = 'NEW PASS';
-        document.getElementById('preview-card-status').className = 'status-badge status-active';
+        if (document.getElementById('preview-user-name')) document.getElementById('preview-user-name').textContent = 'Naya Card Select/Issue Karein';
+        if (document.getElementById('preview-card-id')) document.getElementById('preview-card-id').textContent = 'GL-CARD-XXXX';
+        if (document.getElementById('preview-card-phone')) document.getElementById('preview-card-phone').textContent = '03XX-XXXXXXX';
+        if (document.getElementById('preview-card-balance')) document.getElementById('preview-card-balance').textContent = 'Rs. 0';
+        if (document.getElementById('preview-card-status')) {
+            document.getElementById('preview-card-status').textContent = 'NEW PASS';
+            document.getElementById('preview-card-status').className = 'status-badge status-active';
+        }
         
         const qrBox = document.getElementById('preview-qr-code');
         if (qrBox) {
@@ -907,18 +942,20 @@ document.addEventListener('DOMContentLoaded', () => {
         state.activeCardId = cardId;
         const bal = typeof card.balance === 'number' ? card.balance : 0;
 
-        document.getElementById('preview-user-name').textContent = card.name;
-        document.getElementById('preview-card-id').textContent = card.id;
-        document.getElementById('preview-card-phone').textContent = card.phone;
-        document.getElementById('preview-card-balance').textContent = `Rs. ${bal}`;
+        if (document.getElementById('preview-user-name')) document.getElementById('preview-user-name').textContent = card.name;
+        if (document.getElementById('preview-card-id')) document.getElementById('preview-card-id').textContent = card.id;
+        if (document.getElementById('preview-card-phone')) document.getElementById('preview-card-phone').textContent = card.phone;
+        if (document.getElementById('preview-card-balance')) document.getElementById('preview-card-balance').textContent = `Rs. ${bal}`;
         
         const statusEl = document.getElementById('preview-card-status');
-        if (card.status === 'IN_TRANSIT') {
-            statusEl.textContent = 'IN TRANSIT 🚌';
-            statusEl.className = 'status-badge status-transit';
-        } else {
-            statusEl.textContent = 'ACTIVE ✅';
-            statusEl.className = 'status-badge status-active';
+        if (statusEl) {
+            if (card.status === 'IN_TRANSIT') {
+                statusEl.textContent = 'IN TRANSIT 🚌';
+                statusEl.className = 'status-badge status-transit';
+            } else {
+                statusEl.textContent = 'ACTIVE ✅';
+                statusEl.className = 'status-badge status-active';
+            }
         }
 
         generateQRCode('preview-qr-code', card.id, 105);
@@ -957,7 +994,8 @@ document.addEventListener('DOMContentLoaded', () => {
             if (!state.activeCardId) renderPlaceholderCardPreview();
         } else if (tabName === 'recharge') {
             state.rechargeTargetCardId = null;
-            document.getElementById('recharge-card-result').classList.add('hidden');
+            const resContainer = document.getElementById('recharge-card-result');
+            if (resContainer) resContainer.classList.add('hidden');
             const selectEl = document.getElementById('recharge-select-card');
             if (selectEl) selectEl.value = "";
             const searchInput = document.getElementById('recharge-search-id');
@@ -974,8 +1012,113 @@ document.addEventListener('DOMContentLoaded', () => {
     if (document.getElementById('nav-settings')) document.getElementById('nav-settings').addEventListener('click', () => switchAdminTab('settings'));
 
     // ----------------------------------------------------------------------
-    // 9. CHANGE SECURITY PIN FORM HANDLER
+    // 9. SECURITY PIN & BUTTON EVENT LISTENERS
     // ----------------------------------------------------------------------
+    const btnStartCam = document.getElementById('btn-start-camera');
+    if (btnStartCam) btnStartCam.addEventListener('click', startGuardCameraScanner);
+
+    const btnStopCam = document.getElementById('btn-stop-camera');
+    if (btnStopCam) btnStopCam.addEventListener('click', stopGuardCameraScanner);
+
+    const btnRechargeStartCam = document.getElementById('btn-recharge-camera-start');
+    if (btnRechargeStartCam) btnRechargeStartCam.addEventListener('click', startRechargeCameraScanner);
+
+    const btnRechargeStopCam = document.getElementById('btn-recharge-camera-stop');
+    if (btnRechargeStopCam) btnRechargeStopCam.addEventListener('click', stopRechargeCameraScanner);
+
+    const gateEntryBtn = document.getElementById('gate-mode-entry');
+    if (gateEntryBtn) {
+        gateEntryBtn.addEventListener('click', () => {
+            state.gateMode = 'ENTRY';
+            gateEntryBtn.classList.add('active');
+            const gateExit = document.getElementById('gate-mode-exit');
+            if (gateExit) gateExit.classList.remove('active');
+        });
+    }
+
+    const gateExitBtn = document.getElementById('gate-mode-exit');
+    if (gateExitBtn) {
+        gateExitBtn.addEventListener('click', () => {
+            state.gateMode = 'EXIT';
+            gateExitBtn.classList.add('active');
+            const gateEntry = document.getElementById('gate-mode-entry');
+            if (gateEntry) gateEntry.classList.remove('active');
+        });
+    }
+
+    const btnManualScan = document.getElementById('btn-manual-scan');
+    if (btnManualScan) {
+        btnManualScan.addEventListener('click', () => {
+            const inputEl = document.getElementById('manual-qr-input');
+            if (inputEl && inputEl.value) {
+                processGuardScan(inputEl.value);
+                inputEl.value = '';
+            }
+        });
+    }
+
+    const btnGuardMode = document.getElementById('btn-guard-mode');
+    const btnAdminMode = document.getElementById('btn-admin-mode');
+    const guardView = document.getElementById('guard-view');
+    const adminView = document.getElementById('admin-view');
+    const pinModal = document.getElementById('pin-modal');
+    const pinInput = document.getElementById('pin-input');
+
+    if (btnGuardMode) {
+        btnGuardMode.addEventListener('click', () => {
+            state.activeView = 'GUARD';
+            btnGuardMode.classList.add('active');
+            if (btnAdminMode) btnAdminMode.classList.remove('active');
+            if (guardView) guardView.classList.remove('hidden');
+            if (adminView) adminView.classList.add('hidden');
+            stopRechargeCameraScanner();
+        });
+    }
+
+    if (btnAdminMode) {
+        btnAdminMode.addEventListener('click', () => {
+            if (pinModal) pinModal.classList.remove('hidden');
+            if (pinInput) {
+                pinInput.value = '';
+                pinInput.focus();
+            }
+        });
+    }
+
+    const btnCancelPin = document.getElementById('btn-cancel-pin');
+    if (btnCancelPin) {
+        btnCancelPin.addEventListener('click', () => {
+            if (pinModal) pinModal.classList.add('hidden');
+        });
+    }
+
+    const btnVerifyPin = document.getElementById('btn-verify-pin');
+    if (btnVerifyPin) btnVerifyPin.addEventListener('click', verifyAdminPin);
+
+    if (pinInput) {
+        pinInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') verifyAdminPin();
+        });
+    }
+
+    function verifyAdminPin() {
+        if (pinInput && pinInput.value === state.adminPin) {
+            if (pinModal) pinModal.classList.add('hidden');
+            state.activeView = 'ADMIN';
+            if (btnAdminMode) btnAdminMode.classList.add('active');
+            if (btnGuardMode) btnGuardMode.classList.remove('active');
+            if (adminView) adminView.classList.remove('hidden');
+            if (guardView) guardView.classList.add('hidden');
+            stopGuardCameraScanner();
+        } else {
+            alert('❌ Galat Security PIN Code!');
+            if (pinInput) {
+                pinInput.value = '';
+                pinInput.focus();
+            }
+        }
+    }
+
     const formChangePin = document.getElementById('form-change-pin');
     if (formChangePin) {
         formChangePin.addEventListener('submit', (e) => {
@@ -1008,46 +1151,97 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // ----------------------------------------------------------------------
-    // 10. UNIQUE ID GENERATION & CREATE CARD FORM HANDLER
+    // 10. CARD FORM SUBMISSION & PRINT EVENT LISTENERS
     // ----------------------------------------------------------------------
-    document.getElementById('btn-print-card').addEventListener('click', () => {
-        if (!state.activeCardId) {
-            alert('Pehle Naya Card Issue Karein ya Table se View Card Select Karein.');
-            return;
-        }
+    const btnPrintCard = document.getElementById('btn-print-card');
+    if (btnPrintCard) {
+        btnPrintCard.addEventListener('click', () => {
+            if (!state.activeCardId) {
+                alert('Pehle Naya Card Issue Karein ya Table se View Card Select Karein.');
+                return;
+            }
 
-        const card = state.cards.find(c => c && c.id === state.activeCardId);
-        if (!card) return;
+            const card = state.cards.find(c => c && c.id === state.activeCardId);
+            if (!card) return;
 
-        const bal = typeof card.balance === 'number' ? card.balance : 0;
+            const bal = typeof card.balance === 'number' ? card.balance : 0;
 
-        const printArea = document.getElementById('printable-card-area');
-        printArea.innerHTML = `
-            <div class="smart-pvc-card" style="background:#0b1c38; border:3px solid #00e676; padding:20px; color:#fff; font-family:sans-serif; width:380px; border-radius:16px;">
-                <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid #444; padding-bottom:8px;">
-                    <strong style="color:#00e676; font-size:14px;">KARACHI GREEN LINE BRT</strong>
-                    <span style="background:#ffd700; color:#000; font-size:10px; font-weight:bold; padding:2px 6px; border-radius:8px;">OFFICIAL PASS</span>
-                </div>
-                <div style="display:flex; justify-content:space-between; align-items:center; margin-top:14px;">
-                    <div>
-                        <h3 style="margin:0; font-size:18px;">${card.name}</h3>
-                        <p style="margin:4px 0; font-size:12px; color:#aaa;">Card ID: <b>${card.id}</b></p>
-                        <p style="margin:4px 0; font-size:12px; color:#aaa;">Phone: ${card.phone}</p>
-                        <div style="margin-top:8px; background:rgba(0,230,118,0.2); color:#00e676; padding:4px 8px; border-radius:6px; font-weight:bold; font-size:13px; display:inline-block;">
-                            INITIAL BALANCE: Rs. ${bal}
+            const printArea = document.getElementById('printable-card-area');
+            if (printArea) {
+                printArea.innerHTML = `
+                    <div class="smart-pvc-card" style="background:#0b1c38; border:3px solid #00e676; padding:20px; color:#fff; font-family:sans-serif; width:380px; border-radius:16px;">
+                        <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid #444; padding-bottom:8px;">
+                            <strong style="color:#00e676; font-size:14px;">KARACHI GREEN LINE BRT</strong>
+                            <span style="background:#ffd700; color:#000; font-size:10px; font-weight:bold; padding:2px 6px; border-radius:8px;">OFFICIAL PASS</span>
+                        </div>
+                        <div style="display:flex; justify-content:space-between; align-items:center; margin-top:14px;">
+                            <div>
+                                <h3 style="margin:0; font-size:18px;">${card.name}</h3>
+                                <p style="margin:4px 0; font-size:12px; color:#aaa;">Card ID: <b>${card.id}</b></p>
+                                <p style="margin:4px 0; font-size:12px; color:#aaa;">Phone: ${card.phone}</p>
+                                <div style="margin-top:8px; background:rgba(0,230,118,0.2); color:#00e676; padding:4px 8px; border-radius:6px; font-weight:bold; font-size:13px; display:inline-block;">
+                                    INITIAL BALANCE: Rs. ${bal}
+                                </div>
+                            </div>
+                            <div id="print-qr-target" style="background:#fff; padding:6px; border-radius:8px;"></div>
                         </div>
                     </div>
-                    <div id="print-qr-target" style="background:#fff; padding:6px; border-radius:8px;"></div>
-                </div>
-            </div>
-        `;
+                `;
 
-        generateQRCode('print-qr-target', card.id, 100);
+                generateQRCode('print-qr-target', card.id, 100);
 
-        setTimeout(() => {
-            window.print();
-        }, 300);
-    });
+                setTimeout(() => {
+                    window.print();
+                }, 300);
+            }
+        });
+    }
+
+    const formCreateCard = document.getElementById('form-create-card');
+    if (formCreateCard) {
+        formCreateCard.addEventListener('submit', (e) => {
+            e.preventDefault();
+
+            const name = document.getElementById('card-user-name').value.trim();
+            const phone = document.getElementById('card-user-phone').value.trim();
+            const cnic = document.getElementById('card-user-cnic').value.trim();
+            const initialBal = parseFloat(document.getElementById('card-initial-balance').value);
+
+            let maxNum = 1000;
+            state.cards.forEach(c => {
+                if (c && c.id) {
+                    const match = c.id.match(/\d+/);
+                    if (match) {
+                        const num = parseInt(match[0]);
+                        if (num > maxNum) maxNum = num;
+                    }
+                }
+            });
+
+            const newId = `GL-CARD-${maxNum + 1}`;
+
+            const newCard = {
+                id: newId,
+                name: name,
+                phone: phone,
+                cnic: cnic || 'N/A',
+                balance: initialBal,
+                initialBalance: initialBal,
+                status: 'COMPLETED',
+                createdAt: new Date().toLocaleDateString()
+            };
+
+            state.cards.push(newCard);
+            syncCardToCloud(newCard);
+            state.activeCardId = newId;
+
+            renderApp();
+            displayCardPreview(newId);
+            playGrantedSound();
+            alert(`✅ CARD ISSUED & SYNCED TO ALL DEVICES!\nCard ID: ${newId}\nBalance: Rs. ${initialBal}`);
+            formCreateCard.reset();
+        });
+    }
 
     initStore();
 });
