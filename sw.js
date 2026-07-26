@@ -1,68 +1,56 @@
-const CACHE_NAME = 'voicecalc-v1';
+/* ==========================================================================
+   Karachi Green Line BRT - PWA Service Worker
+   ========================================================================== */
+
+const CACHE_NAME = 'greenline-brt-v1';
 const ASSETS_TO_CACHE = [
-  'index.html',
-  'style.css',
-  'app.js',
-  'manifest.json'
+    './',
+    './index.html',
+    './style.css',
+    './app.js',
+    './manifest.json'
 ];
 
-// Install Service Worker and cache resources
+// Install Event
 self.addEventListener('install', (event) => {
-  event.waitUntil(
-    caches.open(CACHE_NAME)
-      .then((cache) => {
-        console.log('[Service Worker] Caching app shell assets');
-        return cache.addAll(ASSETS_TO_CACHE);
-      })
-      .then(() => self.skipWaiting())
-  );
-});
-
-// Activate Service Worker and clean old caches
-self.addEventListener('activate', (event) => {
-  event.waitUntil(
-    caches.keys().then((cacheNames) => {
-      return Promise.all(
-        cacheNames.map((cacheName) => {
-          if (cacheName !== CACHE_NAME) {
-            console.log('[Service Worker] Deleting old cache:', cacheName);
-            return caches.delete(cacheName);
-          }
+    event.waitUntil(
+        caches.open(CACHE_NAME).then((cache) => {
+            console.log('[PWA Service Worker] Caching App Shell Assets');
+            return cache.addAll(ASSETS_TO_CACHE);
         })
-      );
-    }).then(() => self.clients.claim())
-  );
+    );
+    self.skipWaiting();
 });
 
-// Fetch events: Network first, fallback to Cache, then Offline default
-self.addEventListener('fetch', (event) => {
-  // Only handle GET requests
-  if (event.request.method !== 'GET') return;
+// Activate Event
+self.addEventListener('activate', (event) => {
+    event.waitUntil(
+        caches.keys().then((keyList) => {
+            return Promise.all(keyList.map((key) => {
+                if (key !== CACHE_NAME) {
+                    console.log('[PWA Service Worker] Removing old cache:', key);
+                    return caches.delete(key);
+                }
+            }));
+        })
+    );
+    self.clients.claim();
+});
 
-  event.respondWith(
-    fetch(event.request)
-      .then((response) => {
-        // If request is successful, update cache dynamically
-        if (response.status === 200) {
-          const responseClone = response.clone();
-          caches.open(CACHE_NAME).then((cache) => {
-            cache.put(event.request, responseClone);
-          });
-        }
-        return response;
-      })
-      .catch(() => {
-        // Fallback to cache if offline
-        return caches.match(event.request)
-          .then((cachedResponse) => {
+// Fetch Event (Cache First with Network Fallback)
+self.addEventListener('fetch', (event) => {
+    if (event.request.method !== 'GET') return;
+
+    event.respondWith(
+        caches.match(event.request).then((cachedResponse) => {
             if (cachedResponse) {
-              return cachedResponse;
+                return cachedResponse;
             }
-            // Return placeholder if not found
-            if (event.request.headers.get('accept').includes('text/html')) {
-              return caches.match('index.html');
-            }
-          });
-      })
-  );
+            return fetch(event.request).then((networkResponse) => {
+                return networkResponse;
+            }).catch(() => {
+                return caches.match('./index.html');
+            });
+        })
+    );
 });

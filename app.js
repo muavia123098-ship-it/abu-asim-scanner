@@ -1,916 +1,786 @@
 /* ==========================================================================
-   VoiceCalc - Core Application Engine
+   Karachi Green Line BRT - Smart QR Ticket & Reusable Card System
+   Firebase Cloud Firestore + PWA Home Screen App Installer Integration
    ========================================================================== */
 
-// --- App State ---
-let expression = '';
-let runningResult = '0';
-let isListening = false;
-let isEvaluated = false;
-let speechBuffer = ''; // Holds the cumulative spoken words
+document.addEventListener('DOMContentLoaded', () => {
 
-const settings = {
-    language: 'en-US',
-    speakAnswers: true,
-    continuous: true,
-    soundEffects: true
-};
+    // ----------------------------------------------------------------------
+    // 1. PWA MOBILE INSTALL PROMPT EVENT LISTENER
+    // ----------------------------------------------------------------------
+    let deferredPrompt = null;
+    const btnInstallPwa = document.getElementById('btn-install-pwa');
 
-let history = [];
-
-// --- Web Audio Context for Synthesized Sounds ---
-let audioCtx = null;
-
-function initAudioContext() {
-    if (!audioCtx) {
-        audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-    }
-}
-
-// --- Synthesized Click Sound Effect ---
-function playClickSound() {
-    if (!settings.soundEffects) return;
-    initAudioContext();
-    try {
-        if (audioCtx.state === 'suspended') {
-            audioCtx.resume();
-        }
-        const osc = audioCtx.createOscillator();
-        const gainNode = audioCtx.createGain();
-        
-        osc.type = 'sine';
-        osc.frequency.setValueAtTime(650, audioCtx.currentTime); // Soft high pitch
-        
-        gainNode.gain.setValueAtTime(0.06, audioCtx.currentTime);
-        gainNode.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.04);
-        
-        osc.connect(gainNode);
-        gainNode.connect(audioCtx.destination);
-        
-        osc.start();
-        osc.stop(audioCtx.currentTime + 0.05);
-    } catch (e) {
-        console.warn('Audio feedback failed to play', e);
-    }
-}
-
-// --- Synthesized Calculation Success Chime ---
-function playSuccessSound() {
-    if (!settings.soundEffects) return;
-    initAudioContext();
-    try {
-        if (audioCtx.state === 'suspended') {
-            audioCtx.resume();
-        }
-        const now = audioCtx.currentTime;
-        
-        // Ascending harmonic chime (C5 -> E5 -> G5)
-        const notes = [523.25, 659.25, 783.99]; 
-        notes.forEach((freq, idx) => {
-            const osc = audioCtx.createOscillator();
-            const gainNode = audioCtx.createGain();
-            
-            osc.type = 'sine';
-            osc.frequency.setValueAtTime(freq, now + (idx * 0.07));
-            
-            gainNode.gain.setValueAtTime(0.05, now + (idx * 0.07));
-            gainNode.gain.exponentialRampToValueAtTime(0.001, now + (idx * 0.07) + 0.25);
-            
-            osc.connect(gainNode);
-            gainNode.connect(audioCtx.destination);
-            
-            osc.start(now + (idx * 0.07));
-            osc.stop(now + (idx * 0.07) + 0.3);
-        });
-    } catch (e) {
-        console.warn('Success feedback audio failed', e);
-    }
-}
-
-// --- Synthesized Error Buzzer ---
-function playErrorSound() {
-    if (!settings.soundEffects) return;
-    initAudioContext();
-    try {
-        if (audioCtx.state === 'suspended') {
-            audioCtx.resume();
-        }
-        const osc = audioCtx.createOscillator();
-        const gainNode = audioCtx.createGain();
-        
-        osc.type = 'sawtooth';
-        osc.frequency.setValueAtTime(150, audioCtx.currentTime); // Low buzz
-        
-        gainNode.gain.setValueAtTime(0.08, audioCtx.currentTime);
-        gainNode.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.2);
-        
-        osc.connect(gainNode);
-        gainNode.connect(audioCtx.destination);
-        
-        osc.start();
-        osc.stop(audioCtx.currentTime + 0.25);
-    } catch (e) {
-        console.warn('Error feedback audio failed', e);
-    }
-}
-
-// --- Text To Speech (Read Out Aloud) ---
-function speakAnswer(text) {
-    if (!settings.speakAnswers) return;
-    try {
-        // Cancel active reading to avoid overlapping
-        window.speechSynthesis.cancel();
-        
-        const utterance = new SpeechSynthesisUtterance(text);
-        
-        // Set language-specific accent and speech text
-        if (settings.language.startsWith('ur')) {
-            utterance.lang = 'hi-IN'; // Fallback to Hindi accent which reads Urdu numerals beautifully
-            utterance.rate = 0.9;
-        } else if (settings.language.startsWith('hi')) {
-            utterance.lang = 'hi-IN';
-            utterance.rate = 0.9;
-        } else {
-            utterance.lang = 'en-US';
-            utterance.rate = 1.0;
-        }
-        
-        window.speechSynthesis.speak(utterance);
-    } catch (e) {
-        console.error('Speech synthesis failed', e);
-    }
-}
-
-// --- DOM Cache ---
-const elements = {
-    displayExpression: document.getElementById('display-expression'),
-    displayResult: document.getElementById('display-result'),
-    transcriptionText: document.getElementById('transcription-text'),
-    micBtn: document.getElementById('mic-trigger-btn'),
-    micStatusBadge: document.getElementById('mic-status-badge'),
-    langStatusBadge: document.getElementById('lang-status-badge'),
-    visualizer: document.getElementById('visualizer-panel'),
-    keypadDrawer: document.getElementById('manual-keypad'),
-    toggleKeypadBtn: document.getElementById('toggle-keypad-btn'),
-    
-    // Modals
-    settingsBtn: document.getElementById('settings-btn'),
-    settingsOverlay: document.getElementById('settings-overlay'),
-    closeSettingsBtn: document.getElementById('close-settings-btn'),
-    
-    historyBtn: document.getElementById('history-btn'),
-    historyOverlay: document.getElementById('history-overlay'),
-    closeHistoryBtn: document.getElementById('close-history-btn'),
-    historyContainer: document.getElementById('history-container'),
-    clearHistoryBtn: document.getElementById('clear-history-btn'),
-    
-    openGuideBtn: document.getElementById('open-guide-btn'),
-    guideOverlay: document.getElementById('guide-overlay'),
-    closeGuideBtnTop: document.getElementById('close-guide-btn-top'),
-    closeGuideBtnBottom: document.getElementById('close-guide-btn-bottom'),
-    
-    // Setting Form Nodes
-    languageSelect: document.getElementById('language-select'),
-    ttsToggle: document.getElementById('voice-tts-toggle'),
-    continuousToggle: document.getElementById('continuous-listening-toggle'),
-    soundEffectsToggle: document.getElementById('haptic-audio-toggle')
-};
-
-// --- Math Evaluation Sandbox ---
-function evaluateExpression(expr) {
-    // 1. Remove all spaces
-    let sanitized = expr.replace(/\s+/g, '');
-    
-    // 2. Replace visual arithmetic characters with computer standard ones
-    sanitized = sanitized.replace(/×/g, '*').replace(/÷/g, '/').replace(/−/g, '-');
-    
-    // 3. Strict validation: only digits, decimal points, and arithmetic operators are allowed.
-    if (!/^[0-9+\-*/.()]+$/.test(sanitized)) {
-        throw new Error("Syntax Error");
-    }
-    
-    // 4. Block invalid multiple arithmetic operations (e.g. ++ or //)
-    if (/([+\-*/.]{2,})/.test(sanitized)) {
-        // Exception: allow negative representations like *- or /- or +-
-        if (/([+\*]{2,})/.test(sanitized) || /(\*-|\+-|\/-|\-\-){2,}/.test(sanitized)) {
-            throw new Error("Syntax Error");
-        }
-    }
-    
-    try {
-        // Run safe math calculations using isolated new Function scope
-        const calculation = new Function(`return (${sanitized})`)();
-        
-        if (calculation === Infinity || calculation === -Infinity) {
-            throw new Error("Divide by Zero");
-        }
-        if (isNaN(calculation)) {
-            throw new Error("Syntax Error");
-        }
-        
-        // Remove rounding floating-point issues (e.g. 0.1+0.2) up to 8 decimals
-        return Math.round(calculation * 100000000) / 100000000;
-    } catch (err) {
-        throw new Error(err.message === "Divide by Zero" ? "Divide by Zero" : "Syntax Error");
-    }
-}
-
-// --- Parse Voice Text into Mathematical Syntax ---
-function parseSpeechToMath(text) {
-    let clean = text.toLowerCase();
-
-    // 1. Check for immediate explicit system controls first
-    if (/\b(clear|reset|saaf|khatam|clean|mitaye|mitayein)\b/.test(clean)) {
-        return "COMMAND_CLEAR";
-    }
-    if (/\b(delete|backspace|piche|remove)\b/.test(clean)) {
-        return "COMMAND_BACKSPACE";
-    }
-
-    // 2. Mapping verbal math keywords to absolute signs
-    const mappings = [
-        // Addition
-        { keys: ['plus', 'add', 'jamah', 'jama', 'jamme', 'جمع', 'جوڑ', 'plus mark'], val: ' + ' },
-        // Subtraction
-        { keys: ['minus', 'subtract', 'nifi', 'nifee', 'nfi', 'manfi', 'tafreeq', 'منفی', 'گھٹائیں'], val: ' - ' },
-        // Multiplication
-        { keys: ['multiply', 'multiplied by', 'times', 'into', 'zarb', 'ضرب', 'guna', 'multiplied'], val: ' * ' },
-        // Division
-        { keys: ['divided by', 'divide', 'over', 'takseem', 'تقسیم', 'div', 'divided'], val: ' / ' },
-        // Calculation Evaluation trigger
-        { keys: ['equal to', 'equals', 'equal', 'barabar', 'برابر', 'hove', 'huye', 'ans', 'answer'], val: ' = ' }
-    ];
-
-    mappings.forEach(mapping => {
-        mapping.keys.forEach(key => {
-            // Escape special chars for regex
-            const escaped = key.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&');
-            // If the key is a native language right-to-left word, run standard replace.
-            if (/[\u0600-\u06FF]/.test(key)) {
-                clean = clean.split(key).join(mapping.val);
-            } else {
-                // Word boundary check for standard letters
-                const regex = new RegExp(`\\b${escaped}\\b`, 'g');
-                clean = clean.replace(regex, mapping.val);
-            }
-        });
-    });
-
-    // 3. Mapping Spoken phonetic numeric values to digits
-    const phoneticNumbers = {
-        'zero': '0', 'one': '1', 'two': '2', 'three': '3', 'four': '4', 'five': '5', 'six': '6', 'seven': '7', 'eight': '8', 'nine': '9', 'ten': '10',
-        'eleven': '11', 'twelve': '12', 'thirteen': '13', 'fourteen': '14', 'fifteen': '15',
-        'ek': '1', 'aik': '1', 'do': '2', 'teen': '3', 'chaar': '4', 'char': '4', 'paanch': '5', 'panch': '5', 'che': '6', 'chhe': '6', 'saat': '7', 'aath': '8', 'nau': '9', 'no': '9', 'das': '10',
-        'gyarah': '11', 'barah': '12', 'terah': '13', 'chaudah': '14', 'pandrah': '15', 'solah': '16', 'satrah': '17', 'atharah': '18', 'unnis': '19', 'bees': '20',
-        'tees': '30', 'chalis': '40', 'pachas': '50', 'pachaas': '50', 'saath': '60', 'sattar': '70', 'assi': '80', 'naway': '90', 'nave': '90',
-        'sau': '100', 'so': '100', 'hazaar': '1000', 'hazar': '1000', 'lakh': '100000'
-    };
-
-    Object.keys(phoneticNumbers).forEach(word => {
-        if (/[\u0600-\u06FF]/.test(word)) {
-            clean = clean.split(word).join(phoneticNumbers[word]);
-        } else {
-            const regex = new RegExp(`\\b${word}\\b`, 'g');
-            clean = clean.replace(regex, phoneticNumbers[word]);
+    window.addEventListener('beforeinstallprompt', (e) => {
+        // Prevent default browser banner
+        e.preventDefault();
+        deferredPrompt = e;
+        // Show our custom Install App button
+        if (btnInstallPwa) {
+            btnInstallPwa.classList.remove('hidden');
         }
     });
 
-    // 4. Sanitize out non-math junk phrases (e.g. "hey calculator", "hello", "yar", "please", etc.)
-    // Only permit digits, operators, decimals, spaces, and the equals symbol.
-    clean = clean.replace(/[^0-9+\-*/.= ]/g, '');
-
-    return clean;
-}
-
-// --- Render Mathematical Formatting ---
-function formatExpressionForDisplay(expr) {
-    if (!expr) return '';
-    // Format mathematical operational symbols with colored wrappers
-    return expr
-        .replace(/\+/g, '<span class="operator">+</span>')
-        .replace(/-/g, '<span class="operator">−</span>')
-        .replace(/\*/g, '<span class="operator">×</span>')
-        .replace(/\//g, '<span class="operator">÷</span>');
-}
-
-// --- Process Inputs (Spoken Text or Keys) ---
-function processInputData(rawExpr, isVoiceFinal = false) {
-    if (rawExpr === "COMMAND_CLEAR") {
-        clearCalculator();
-        playClickSound();
-        return;
-    }
-    
-    if (rawExpr === "COMMAND_BACKSPACE") {
-        expression = expression.trim();
-        if (expression.length > 0) {
-            expression = expression.substring(0, expression.length - 1).trim();
-            updateDisplay();
-        }
-        playClickSound();
-        return;
-    }
-
-    // Clean multiple space issues
-    let parsed = rawExpr.replace(/\s+/g, ' ');
-    
-    // Check if the parsed expression contains an evaluation trigger
-    const containsEquals = parsed.includes('=');
-    
-    // Extract actual numeric formula part (omit anything past equals sign)
-    let formula = parsed.split('=')[0].trim();
-    
-    // Keep internal standard operators (remove visual dividers)
-    formula = formula.replace(/\s+/g, '');
-
-    if (formula) {
-        expression = formula;
-    }
-
-    updateDisplay();
-
-    // Check if we can compute a live running result
-    if (expression && !isEvaluated) {
-        try {
-            // Strip trailing operators so we don't trigger syntax errors during typing
-            let testExpr = expression;
-            while (['+', '-', '*', '/'].includes(testExpr.slice(-1))) {
-                testExpr = testExpr.slice(0, -1);
-            }
-            if (testExpr && !/^[+\-*/.()]+$/.test(testExpr)) {
-                const runningValue = evaluateExpression(testExpr);
-                runningResult = runningValue.toString();
-                elements.displayResult.textContent = runningResult;
-            }
-        } catch (e) {
-            // Quietly suppress running evaluation errors
-        }
-    }
-
-    // Trigger Final Calculation
-    if (containsEquals || isVoiceFinal) {
-        triggerCalculationFinal();
-    }
-}
-
-// --- Execute Final Calculation ---
-function triggerCalculationFinal() {
-    if (!expression) return;
-    
-    try {
-        const finalValue = evaluateExpression(expression);
-        const formulaText = expression
-            .replace(/\*/g, ' × ')
-            .replace(/\//g, ' ÷ ')
-            .replace(/-/g, ' − ')
-            .replace(/\+/g, ' + ');
-            
-        const resultString = finalValue.toString();
-        
-        // Sound and Speech
-        playSuccessSound();
-        
-        // Save to active states
-        elements.displayResult.textContent = resultString;
-        elements.displayResult.classList.add('evaluated');
-        isEvaluated = true;
-        
-        // Add to persistent calculation history array
-        const historyItem = {
-            expression: formulaText,
-            result: resultString,
-            timestamp: Date.now()
-        };
-        history.unshift(historyItem); // Add to top
-        saveHistoryToLocalStorage();
-        
-        // Build vocal audio response
-        let voiceMessage = '';
-        if (settings.language.startsWith('ur') || settings.language.startsWith('hi')) {
-            voiceMessage = `Aapka jawaab hai ${resultString}`;
-        } else {
-            voiceMessage = `Your answer is ${resultString}`;
-        }
-        speakAnswer(voiceMessage);
-        
-    } catch (err) {
-        playErrorSound();
-        elements.displayResult.textContent = err.message;
-        elements.displayResult.classList.remove('evaluated');
-        speakAnswer(settings.language.startsWith('ur') ? "calculation galat hai" : "Syntax error");
-    }
-}
-
-// --- Clear Calculator State ---
-function clearCalculator() {
-    expression = '';
-    runningResult = '0';
-    isEvaluated = false;
-    speechBuffer = '';
-    elements.displayExpression.innerHTML = '';
-    elements.displayResult.textContent = '0';
-    elements.displayResult.classList.remove('evaluated');
-    elements.transcriptionText.textContent = isListening ? 'Listening...' : 'Press Mic & Speak...';
-    elements.transcriptionText.classList.remove('active');
-}
-
-// --- Update Screen Views ---
-function updateDisplay() {
-    // Show visual formula expressions
-    const visualHTML = formatExpressionForDisplay(expression);
-    elements.displayExpression.innerHTML = visualHTML;
-    
-    if (isEvaluated) {
-        elements.displayResult.classList.add('evaluated');
-    } else {
-        elements.displayResult.classList.remove('evaluated');
-    }
-}
-
-// ==========================================================================
-// --- Browser Speech Recognition Setup ---
-// ==========================================================================
-const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-let recognition = null;
-let recognitionTimer = null; // Auto-silence timer
-
-if (SpeechRecognition) {
-    recognition = new SpeechRecognition();
-    recognition.continuous = true;
-    recognition.interimResults = true;
-    
-    recognition.onstart = () => {
-        isListening = true;
-        elements.micBtn.classList.add('active');
-        elements.micStatusBadge.textContent = 'Listening';
-        elements.micStatusBadge.className = 'badge badge-active';
-        elements.visualizer.classList.add('active');
-        elements.transcriptionText.textContent = 'Say something...';
-        elements.transcriptionText.classList.add('active');
-        
-        // Start continuous silence detection
-        resetAutoSilenceTimer();
-    };
-
-    recognition.onresult = (event) => {
-        resetAutoSilenceTimer();
-        let interimTranscript = '';
-        let finalTranscript = '';
-
-        for (let i = event.resultIndex; i < event.results.length; ++i) {
-            const transcript = event.results[i][0].transcript;
-            if (event.results[i].isFinal) {
-                finalTranscript += transcript;
+    if (btnInstallPwa) {
+        btnInstallPwa.addEventListener('click', async () => {
+            if (deferredPrompt) {
+                deferredPrompt.prompt();
+                const { outcome } = await deferredPrompt.userChoice;
+                console.log(`PWA Install Choice Outcome: ${outcome}`);
+                deferredPrompt = null;
+                btnInstallPwa.classList.add('hidden');
             } else {
-                interimTranscript += transcript;
+                alert('📲 App Install Tips:\n\n• Mobile Chrome / Edge: Top 3-dots menu par click karke "Add to Home screen" ya "Install App" select karein.\n• iPhone Safari: Share button par tap karke "Add to Home Screen" select karein!');
             }
-        }
-
-        // Combine cumulative speaking buffer
-        const fullTranscript = (speechBuffer + ' ' + finalTranscript + ' ' + interimTranscript).trim();
-        
-        // Update live visual text subtitle box
-        const previewText = fullTranscript || 'Analyzing speech...';
-        elements.transcriptionText.textContent = previewText;
-        
-        // Core Parsing
-        const parsedMath = parseSpeechToMath(fullTranscript);
-        
-        if (parsedMath) {
-            processInputData(parsedMath, false);
-        }
-
-        // Save stable speech segments back to buffer
-        if (finalTranscript) {
-            speechBuffer = (speechBuffer + ' ' + finalTranscript).trim();
-        }
-    };
-
-    recognition.onerror = (event) => {
-        console.error('Speech recognition error:', event.error);
-        if (event.error === 'not-allowed') {
-            alert('Microphone access is blocked! Please enable microphone settings in your browser address bar.');
-            stopListeningState();
-        }
-        elements.micStatusBadge.textContent = 'Error';
-        elements.micStatusBadge.className = 'badge badge-inactive';
-    };
-
-    recognition.onend = () => {
-        // Automatically restart listening if continuous mode is enabled in parameters and we did not stop manually
-        if (isListening && settings.continuous) {
-            try {
-                recognition.start();
-            } catch (e) {
-                console.warn("Failed to automatically restart recognition loop", e);
-            }
-        } else {
-            stopListeningState();
-        }
-    };
-} else {
-    // Unsupported browser fallback configurations
-    elements.micBtn.disabled = true;
-    elements.micTooltip.textContent = 'Speech not supported in this browser';
-    elements.micStatusBadge.textContent = 'Not Supported';
-    elements.micStatusBadge.className = 'badge badge-inactive';
-}
-
-function startListeningState() {
-    if (!recognition) return;
-    initAudioContext();
-    speechBuffer = ''; // Reset buffer
-    
-    // Clear output if already evaluated to let users perform consecutive calculations seamlessly
-    if (isEvaluated) {
-        clearCalculator();
+        });
     }
-    
-    // Configure settings
-    recognition.lang = settings.language;
-    recognition.continuous = settings.continuous;
-    
-    try {
-        recognition.start();
-        playClickSound();
-    } catch (err) {
-        console.error('Could not start recognition engine:', err);
-    }
-}
 
-function stopListeningState() {
-    isListening = false;
-    elements.micBtn.classList.remove('active');
-    elements.micStatusBadge.textContent = 'Offline';
-    elements.micStatusBadge.className = 'badge badge-inactive';
-    elements.visualizer.classList.remove('active');
-    elements.transcriptionText.classList.remove('active');
-    elements.transcriptionText.textContent = 'Press Mic & Speak...';
-    
-    clearTimeout(recognitionTimer);
+    // ----------------------------------------------------------------------
+    // 2. FIREBASE CONFIGURATION & CLOUD INITIALIZATION
+    // ----------------------------------------------------------------------
+    const firebaseConfig = {
+        apiKey: "AIzaSyAVuxdQ-k8pZyy2PnoTwBG3XEpAt2-cLsc",
+        authDomain: "greenline-system.firebaseapp.com",
+        projectId: "greenline-system",
+        storageBucket: "greenline-system.firebasestorage.app",
+        messagingSenderId: "639566437448",
+        appId: "1:639566437448:web:ed646713ae76f0ff3b0c7d"
+    };
 
-    if (recognition) {
+    let db = null;
+    let isCloudOnline = false;
+
+    if (typeof firebase !== 'undefined') {
         try {
-            recognition.stop();
-        } catch (e) {}
-    }
-}
-
-// Silence Detection: If no speech is recorded for 8 seconds, automatically evaluate current numbers
-function resetAutoSilenceTimer() {
-    clearTimeout(recognitionTimer);
-    if (!isListening) return;
-    
-    recognitionTimer = setTimeout(() => {
-        if (expression && !isEvaluated && !['+', '-', '*', '/'].includes(expression.slice(-1))) {
-            triggerCalculationFinal();
-            stopListeningState();
-        }
-    }, 8000); // 8 seconds of continuous silence trigger auto-calculation
-}
-
-// --- Toggle Microphone Button ---
-elements.micBtn.addEventListener('click', () => {
-    if (isListening) {
-        stopListeningState();
-        playClickSound();
-    } else {
-        startListeningState();
-    }
-});
-
-// ==========================================================================
-// --- Tactile Manual Keypad Bindings ---
-// ==========================================================================
-elements.keypadDrawer.addEventListener('click', (e) => {
-    const btn = e.target.closest('.key-btn');
-    if (!btn) return;
-    
-    const key = btn.dataset.key;
-    playClickSound();
-    
-    if (isEvaluated && key !== 'equals') {
-        // Clear result screen and keep expression if using an operator next, or clear both if typing a new number
-        if (['+', '-', '*', '/'].includes(key)) {
-            expression = elements.displayResult.textContent;
-        } else {
-            expression = '';
-        }
-        isEvaluated = false;
-        elements.displayResult.classList.remove('evaluated');
-    }
-
-    if (key === 'clear') {
-        clearCalculator();
-    } else if (key === 'backspace') {
-        if (expression.length > 0) {
-            expression = expression.slice(0, -1);
-            updateDisplay();
-        }
-    } else if (key === 'equals') {
-        triggerCalculationFinal();
-    } else {
-        // Standard Numbers & Operators
-        // Avoid duplicate decimals in a single number sequence
-        if (key === '.') {
-            const parts = expression.split(/[\+\-\*\/]/);
-            const currentNum = parts[parts.length - 1];
-            if (currentNum.includes('.')) return;
-        }
-        
-        // Prevent typing multiple consecutive operators
-        if (['+', '-', '*', '/'].includes(key)) {
-            if (['+', '-', '*', '/'].includes(expression.slice(-1))) {
-                expression = expression.slice(0, -1);
-            }
-        }
-        
-        expression += key;
-        updateDisplay();
-    }
-});
-
-// Keypad drawer slider
-elements.toggleKeypadBtn.addEventListener('click', () => {
-    const isCollapsed = elements.keypadDrawer.classList.toggle('collapsed');
-    elements.toggleKeypadBtn.querySelector('.chevron').classList.toggle('rotate', !isCollapsed);
-    elements.toggleKeypadBtn.querySelector('span').textContent = isCollapsed ? 'Show Manual Keypad' : 'Hide Manual Keypad';
-    playClickSound();
-});
-
-// ==========================================================================
-// --- Modal Dialogs & Event Actions ---
-// ==========================================================================
-function toggleOverlay(overlay, show) {
-    if (show) {
-        overlay.classList.remove('hidden');
-        playClickSound();
-    } else {
-        overlay.classList.add('hidden');
-        playClickSound();
-    }
-}
-
-// Settings Overlay events
-elements.settingsBtn.addEventListener('click', () => toggleOverlay(elements.settingsOverlay, true));
-elements.closeSettingsBtn.addEventListener('click', () => toggleOverlay(elements.settingsOverlay, false));
-elements.settingsOverlay.addEventListener('click', (e) => {
-    if (e.target === elements.settingsOverlay) toggleOverlay(elements.settingsOverlay, false);
-});
-
-// History Overlay events
-elements.historyBtn.addEventListener('click', () => {
-    renderHistoryDrawerList();
-    toggleOverlay(elements.historyOverlay, true);
-});
-elements.closeHistoryBtn.addEventListener('click', () => toggleOverlay(elements.historyOverlay, false));
-elements.historyOverlay.addEventListener('click', (e) => {
-    if (e.target === elements.historyOverlay) toggleOverlay(elements.historyOverlay, false);
-});
-
-// Speaking Guide events
-elements.openGuideBtn.addEventListener('click', () => toggleOverlay(elements.guideOverlay, true));
-elements.closeGuideBtnTop.addEventListener('click', () => toggleOverlay(elements.guideOverlay, false));
-elements.closeGuideBtnBottom.addEventListener('click', () => toggleOverlay(elements.guideOverlay, false));
-elements.guideOverlay.addEventListener('click', (e) => {
-    if (e.target === elements.guideOverlay) toggleOverlay(elements.guideOverlay, false);
-});
-
-// Sync Setting forms changes
-elements.languageSelect.addEventListener('change', (e) => {
-    settings.language = e.target.value;
-    
-    // Update visual language badge indicator
-    let badgeText = 'English';
-    if (settings.language === 'ur-PK') badgeText = 'Urdu / Hinglish';
-    if (settings.language === 'hi-IN') badgeText = 'Hindi';
-    
-    elements.langStatusBadge.textContent = badgeText;
-    
-    // Apply special styling accent for native speech modes
-    if (settings.language !== 'en-US') {
-        elements.langStatusBadge.className = 'badge badge-accent';
-    } else {
-        elements.langStatusBadge.className = 'badge';
-    }
-    
-    saveSettingsToLocalStorage();
-});
-
-elements.ttsToggle.addEventListener('change', (e) => {
-    settings.speakAnswers = e.target.checked;
-    saveSettingsToLocalStorage();
-});
-
-elements.continuousToggle.addEventListener('change', (e) => {
-    settings.continuous = e.target.checked;
-    saveSettingsToLocalStorage();
-});
-
-elements.soundEffectsToggle.addEventListener('change', (e) => {
-    settings.soundEffects = e.target.checked;
-    saveSettingsToLocalStorage();
-});
-
-// ==========================================================================
-// --- Persistent Browser Storage Buffers ---
-// ==========================================================================
-function saveSettingsToLocalStorage() {
-    localStorage.setItem('voicecalc_settings', JSON.stringify(settings));
-}
-
-function loadSettingsFromLocalStorage() {
-    const saved = localStorage.getItem('voicecalc_settings');
-    if (saved) {
-        try {
-            const parsed = JSON.parse(saved);
-            Object.assign(settings, parsed);
-            
-            // Sync values to DOM nodes
-            elements.languageSelect.value = settings.language;
-            elements.ttsToggle.checked = settings.speakAnswers;
-            elements.continuousToggle.checked = settings.continuous;
-            elements.soundEffectsToggle.checked = settings.soundEffects;
-            
-            // Set language status badge
-            let badgeText = 'English';
-            if (settings.language === 'ur-PK') badgeText = 'Urdu / Hinglish';
-            if (settings.language === 'hi-IN') badgeText = 'Hindi';
-            elements.langStatusBadge.textContent = badgeText;
-            if (settings.language !== 'en-US') {
-                elements.langStatusBadge.className = 'badge badge-accent';
-            }
+            firebase.initializeApp(firebaseConfig);
+            db = firebase.firestore();
+            isCloudOnline = true;
+            console.log("🟢 Firebase Real-Time Cloud Firestore Connected!");
         } catch (e) {
-            console.error('Failed to parse settings buffer', e);
+            console.error("Firebase init error, fallback to LocalStorage:", e);
         }
     }
-}
 
-function saveHistoryToLocalStorage() {
-    localStorage.setItem('voicecalc_history', JSON.stringify(history));
-}
+    const FARE_PER_SCAN = 25; // Flat Rs. 25 deducted on every scan
+    const ADMIN_PIN_DEFAULT = "1234";
 
-function loadHistoryFromLocalStorage() {
-    const saved = localStorage.getItem('voicecalc_history');
-    if (saved) {
+    let state = {
+        cards: [],
+        revenue: 0,
+        gateMode: 'ENTRY', // 'ENTRY' or 'EXIT'
+        activeView: 'GUARD', // 'GUARD' or 'ADMIN'
+        activeAdminTab: 'dash', // 'dash', 'issue', 'recharge', 'gallery'
+        scannerActive: false,
+        rechargeScannerActive: false,
+        lastScanTime: 0,
+        activeCardId: null,
+        rechargeTargetCardId: null
+    };
+
+    let html5QrCodeGuard = null;
+    let html5QrCodeRecharge = null;
+
+    // Load initial state & Listen to Firebase Real-time Changes
+    function initStore() {
+        if (isCloudOnline && db) {
+            db.collection("cards").onSnapshot((snapshot) => {
+                const cloudCards = [];
+                let calcRevenue = 0;
+
+                snapshot.forEach((doc) => {
+                    const data = doc.data();
+                    cloudCards.push(data);
+                    if (data.initialBalance) calcRevenue += data.initialBalance;
+                });
+
+                state.cards = cloudCards;
+                state.revenue = calcRevenue;
+
+                saveLocalStorageBackup();
+                renderApp();
+            }, (error) => {
+                console.warn("Firestore sync error, loading local backup:", error);
+                loadLocalStorageBackup();
+            });
+        } else {
+            loadLocalStorageBackup();
+        }
+    }
+
+    function loadLocalStorageBackup() {
+        const savedCards = localStorage.getItem('gl_cards_db');
+        const savedRevenue = localStorage.getItem('gl_revenue');
+
+        if (savedCards) {
+            state.cards = JSON.parse(savedCards);
+        } else {
+            state.cards = [];
+        }
+
+        if (savedRevenue) {
+            state.revenue = parseFloat(savedRevenue);
+        }
+        renderApp();
+    }
+
+    function saveLocalStorageBackup() {
+        localStorage.setItem('gl_cards_db', JSON.stringify(state.cards));
+        localStorage.setItem('gl_revenue', state.revenue.toString());
+    }
+
+    function syncCardToCloud(card) {
+        saveLocalStorageBackup();
+        if (isCloudOnline && db) {
+            db.collection("cards").doc(card.id).set(card, { merge: true })
+                .then(() => console.log(`Cloud Synced: ${card.id}`))
+                .catch(err => console.error("Cloud Save Error:", err));
+        }
+    }
+
+    // ----------------------------------------------------------------------
+    // 3. WEB AUDIO API SOUND SYNTHESIZER
+    // ----------------------------------------------------------------------
+    let audioCtx = null;
+
+    function getAudioContext() {
+        if (!audioCtx) {
+            audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        }
+        if (audioCtx.state === 'suspended') {
+            audioCtx.resume();
+        }
+        return audioCtx;
+    }
+
+    function playGrantedSound() {
         try {
-            history = JSON.parse(saved);
+            const ctx = getAudioContext();
+            const now = ctx.currentTime;
+            
+            const osc1 = ctx.createOscillator();
+            const osc2 = ctx.createOscillator();
+            const gain = ctx.createGain();
+
+            osc1.type = 'sine';
+            osc2.type = 'sine';
+
+            osc1.frequency.setValueAtTime(523.25, now);
+            osc1.frequency.setValueAtTime(659.25, now + 0.12);
+
+            osc2.frequency.setValueAtTime(1046.50, now);
+            osc2.frequency.setValueAtTime(1318.51, now + 0.12);
+
+            gain.gain.setValueAtTime(0.25, now);
+            gain.gain.exponentialRampToValueAtTime(0.001, now + 0.45);
+
+            osc1.connect(gain);
+            osc2.connect(gain);
+            gain.connect(ctx.destination);
+
+            osc1.start(now);
+            osc2.start(now);
+            osc1.stop(now + 0.45);
+            osc2.stop(now + 0.45);
         } catch (e) {
-            console.error('Failed to parse history buffer', e);
+            console.log('Audio playback prevented:', e);
         }
     }
-}
 
-function renderHistoryDrawerList() {
-    elements.historyContainer.innerHTML = '';
-    
-    if (history.length === 0) {
-        elements.historyContainer.innerHTML = `
-            <div class="empty-state">
-                <p>No calculations recorded yet.</p>
-                <span>Your history will show up here as you make calculations.</span>
+    function playDeniedAlarmSound() {
+        try {
+            const ctx = getAudioContext();
+            const now = ctx.currentTime;
+
+            const osc = ctx.createOscillator();
+            const gain = ctx.createGain();
+
+            osc.type = 'sawtooth';
+
+            for (let i = 0; i < 6; i++) {
+                osc.frequency.setValueAtTime(850, now + (i * 0.15));
+                osc.frequency.setValueAtTime(450, now + (i * 0.15) + 0.075);
+            }
+
+            gain.gain.setValueAtTime(0.4, now);
+            gain.gain.exponentialRampToValueAtTime(0.01, now + 1.0);
+
+            osc.connect(gain);
+            gain.connect(ctx.destination);
+
+            osc.start(now);
+            osc.stop(now + 1.0);
+        } catch (e) {
+            console.log('Audio playback prevented:', e);
+        }
+    }
+
+    // ----------------------------------------------------------------------
+    // 4. QR CODE GENERATOR UTILITY
+    // ----------------------------------------------------------------------
+    function generateQRCode(elementId, textData, size = 95) {
+        const container = document.getElementById(elementId);
+        if (!container) return;
+        container.innerHTML = '';
+
+        if (typeof QRCode !== 'undefined') {
+            new QRCode(container, {
+                text: textData,
+                width: size,
+                height: size,
+                colorDark: "#000000",
+                colorLight: "#ffffff",
+                correctLevel: QRCode.CorrectLevel.H
+            });
+        } else {
+            container.innerHTML = `<div style="padding:8px; background:#fff; color:#000; font-size:9px; word-break:break-all; text-align:center;"><b>${textData}</b></div>`;
+        }
+    }
+
+    // ----------------------------------------------------------------------
+    // 5. GUARD SCANNER & GATE SCANNING CORE LOGIC
+    // ----------------------------------------------------------------------
+    function processGuardScan(rawText) {
+        const now = Date.now();
+        if (now - state.lastScanTime < 1500) return;
+        state.lastScanTime = now;
+
+        const cardId = rawText.trim();
+        const card = state.cards.find(c => c.id.toUpperCase() === cardId.toUpperCase());
+
+        if (!card) {
+            triggerSignalResult(false, 'INVALID / TAMPERED QR', 'Yeh QR Code System DB Mein Register Nahi Hai!');
+            addScanHistoryLog(cardId, 'Unknown', 'DENIED - FAKE/UNREGISTERED', 0);
+            return;
+        }
+
+        if (state.gateMode === 'ENTRY') {
+            if (card.status === 'IN_TRANSIT') {
+                triggerSignalResult(false, 'ALREADY INSIDE', `${card.name} Pehle Se Station Ke Andar Hai! Exit Gate Scan Karein.`);
+                addScanHistoryLog(card.id, card.name, 'DENIED - ALREADY IN', 0);
+                return;
+            }
+
+            if (card.balance < FARE_PER_SCAN) {
+                triggerSignalResult(false, 'INSUFFICIENT BALANCE 🔴', `${card.name} Ka Balance Kam Hai! Current: Rs. ${card.balance}`);
+                addScanHistoryLog(card.id, card.name, 'DENIED - LOW BALANCE', card.balance);
+                return;
+            }
+
+            // SUCCESS ENTRY 🟢
+            card.balance -= FARE_PER_SCAN;
+            card.status = 'IN_TRANSIT';
+            
+            syncCardToCloud(card);
+
+            triggerSignalResult(true, 'ENTRY GRANTED 🟢', `Fare Deducted: Rs. ${FARE_PER_SCAN} | Remaining Balance: Rs. ${card.balance}`, card.name);
+            addScanHistoryLog(card.id, card.name, 'GRANTED (ENTRY)', FARE_PER_SCAN);
+
+        } else {
+            if (card.status !== 'IN_TRANSIT') {
+                triggerSignalResult(false, 'NO ENTRY RECORD', `${card.name} Ka Entry Record Nahi Mila!`);
+                addScanHistoryLog(card.id, card.name, 'DENIED - NO ENTRY LOG', 0);
+                return;
+            }
+
+            if (card.balance < FARE_PER_SCAN) {
+                triggerSignalResult(false, 'INSUFFICIENT FARE', `${card.name} Ka Remaining Exit Fare Kam Hai! Balance: Rs. ${card.balance}`);
+                addScanHistoryLog(card.id, card.name, 'DENIED - LOW EXIT BALANCE', card.balance);
+                return;
+            }
+
+            // SUCCESS EXIT 🟢
+            card.balance -= FARE_PER_SCAN;
+            card.status = 'COMPLETED';
+
+            syncCardToCloud(card);
+
+            triggerSignalResult(true, 'EXIT CLEARED 🟢', `Journey Complete | Final Fare Deducted: Rs. ${FARE_PER_SCAN} | Remaining: Rs. ${card.balance}`, card.name);
+            addScanHistoryLog(card.id, card.name, 'GRANTED (EXIT)', FARE_PER_SCAN);
+        }
+    }
+
+    function triggerSignalResult(isSuccess, title, msg, cardUser = '') {
+        const overlay = document.getElementById('signal-overlay');
+        const iconEl = document.getElementById('signal-icon');
+        const titleEl = document.getElementById('signal-title');
+        const msgEl = document.getElementById('signal-msg');
+        const infoEl = document.getElementById('signal-card-info');
+
+        overlay.className = 'signal-overlay';
+
+        if (isSuccess) {
+            overlay.classList.add('signal-granted');
+            iconEl.innerHTML = '<i class="fa-solid fa-circle-check"></i>';
+            playGrantedSound();
+        } else {
+            overlay.classList.add('signal-denied');
+            iconEl.innerHTML = '<i class="fa-solid fa-triangle-exclamation"></i>';
+            playDeniedAlarmSound();
+        }
+
+        titleEl.textContent = title;
+        msgEl.textContent = msg;
+        infoEl.textContent = cardUser ? `Passenger: ${cardUser}` : '';
+
+        setTimeout(() => {
+            overlay.classList.add('hidden');
+        }, 1800);
+    }
+
+    function addScanHistoryLog(cardId, name, resultText, fare) {
+        const historyList = document.getElementById('scan-history-list');
+        if (!historyList) return;
+
+        const isGranted = resultText.includes('GRANTED');
+        const timeStr = new Date().toLocaleTimeString();
+
+        const logItem = document.createElement('div');
+        logItem.className = `history-item ${isGranted ? 'status-granted' : 'status-denied'}`;
+        logItem.innerHTML = `
+            <div>
+                <strong>${name}</strong> (${cardId})
+                <br><span style="font-size:0.75rem; color:#aaa;">${state.gateMode} • ${resultText}</span>
+            </div>
+            <div style="text-align:right;">
+                <span style="font-weight:700; color:${isGranted ? '#00e676' : '#ff1744'};">${fare > 0 ? '-Rs. ' + fare : 'Rs. 0'}</span>
+                <br><span style="font-size:0.7rem; color:#8e9bb0;">${timeStr}</span>
             </div>
         `;
-        return;
-    }
-    
-    history.forEach((item, index) => {
-        const dateStr = new Date(item.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-        const div = document.createElement('div');
-        div.className = 'history-item';
-        div.dataset.index = index;
-        div.innerHTML = `
-            <div class="history-expr">${item.expression} =</div>
-            <div class="history-res">${item.result}</div>
-            <span style="font-size: 0.65rem; color: var(--text-muted); margin-top:2px;">${dateStr}</span>
-        `;
-        
-        // Injects back into calculation displays on tap/click
-        div.addEventListener('click', () => {
-            expression = item.expression.replace(/\s+/g, '').replace(/×/g, '*').replace(/÷/g, '/').replace(/−/g, '-');
-            runningResult = item.result;
-            isEvaluated = true;
-            updateDisplay();
-            elements.displayResult.textContent = runningResult;
-            toggleOverlay(elements.historyOverlay, false);
-        });
-        
-        elements.historyContainer.appendChild(div);
-    });
-}
 
-// Clear History Button event
-elements.clearHistoryBtn.addEventListener('click', () => {
-    if (confirm('Are you sure you want to delete all historical logs?')) {
-        history = [];
-        saveHistoryToLocalStorage();
-        renderHistoryDrawerList();
-        playClickSound();
-    }
-});
-
-// ==========================================================================
-// --- Initialization Procedures ---
-// ==========================================================================
-window.addEventListener('DOMContentLoaded', () => {
-    loadSettingsFromLocalStorage();
-    loadHistoryFromLocalStorage();
-    initPwaInstallFlow(); // Start PWA install check!
-    
-    // Welcome vocal speech chime and guidelines popup on first open
-    if (!localStorage.getItem('voicecalc_visited')) {
-        localStorage.setItem('voicecalc_visited', 'true');
-        setTimeout(() => {
-            toggleOverlay(elements.guideOverlay, true);
-        }, 800);
-    }
-});
-
-// ==========================================================================
-// --- PWA Installation & Onboarding Engine ---
-// ==========================================================================
-let deferredPrompt = null;
-const pwaInstallOverlay = document.getElementById('pwa-install-overlay');
-const pwaInstallBtn = document.getElementById('pwa-install-btn');
-const iosInstallInstructions = document.getElementById('ios-install-instructions');
-const pwaSkipBtn = document.getElementById('pwa-skip-btn');
-
-// Check if running in standalone mode (installed)
-function isRunningStandalone() {
-    return (
-        window.matchMedia('(display-mode: standalone)').matches ||
-        window.navigator.standalone || // iOS standalone Safari check
-        document.referrer.includes('android-app://') // Android Trusted Web Activity check
-    );
-}
-
-// Detect iOS/Safari
-function isIOS() {
-    return /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
-}
-
-// Initialize PWA Installation Screen
-function initPwaInstallFlow() {
-    if (isRunningStandalone()) {
-        // Already installed, hide overlay immediately
-        pwaInstallOverlay.classList.add('hidden');
-        return;
-    }
-
-    // Not installed: show install onboarding overlay
-    pwaInstallOverlay.classList.remove('hidden');
-
-    // If iOS Safari, standard automated prompts aren't supported. Show manual guide box
-    if (isIOS()) {
-        if (pwaInstallBtn) pwaInstallBtn.style.display = 'none';
-        if (iosInstallInstructions) iosInstallInstructions.classList.remove('hidden');
-    }
-
-    // Skip/Bypass button event
-    if (pwaSkipBtn) {
-        pwaSkipBtn.addEventListener('click', () => {
-            pwaInstallOverlay.classList.add('hidden');
-            playClickSound();
-        });
-    }
-
-    // Capture standard PWA installation event (Chrome/Android/Edge/Windows)
-    window.addEventListener('beforeinstallprompt', (e) => {
-        // Prevent default browser mini-info bar from popping up
-        e.preventDefault();
-        // Save event trigger to global state
-        deferredPrompt = e;
-        
-        // Ensure install buttons are shown
-        if (pwaInstallBtn) {
-            pwaInstallBtn.style.display = 'flex';
-            
-            // Unbind any previous listeners and bind new click event
-            pwaInstallBtn.onclick = () => {
-                playClickSound();
-                // Trigger native prompt
-                deferredPrompt.prompt();
-                
-                // Track choice response
-                deferredPrompt.userChoice.then((choiceResult) => {
-                    if (choiceResult.outcome === 'accepted') {
-                        console.log('User accepted PWA installation');
-                        pwaInstallOverlay.classList.add('hidden');
-                    } else {
-                        console.log('User dismissed PWA installation');
-                    }
-                    deferredPrompt = null;
-                });
-            };
+        if (historyList.querySelector('.empty-state')) {
+            historyList.innerHTML = '';
         }
-        
-        if (iosInstallInstructions) iosInstallInstructions.classList.add('hidden');
+
+        historyList.prepend(logItem);
+    }
+
+    // ----------------------------------------------------------------------
+    // 6. CAMERA SCANNER LOGIC
+    // ----------------------------------------------------------------------
+    function startGuardCameraScanner() {
+        if (typeof Html5Qrcode === 'undefined') return;
+
+        if (!html5QrCodeGuard) {
+            html5QrCodeGuard = new Html5Qrcode("reader");
+        }
+
+        const config = { fps: 15, qrbox: { width: 220, height: 220 } };
+
+        html5QrCodeGuard.start(
+            { facingMode: "environment" },
+            config,
+            (decodedText) => processGuardScan(decodedText),
+            (err) => {}
+        ).then(() => {
+            state.scannerActive = true;
+            document.getElementById('btn-start-camera').classList.add('hidden');
+            document.getElementById('btn-stop-camera').classList.remove('hidden');
+        }).catch(err => {
+            alert('Camera access denied ya camera open nahi ho saka.');
+        });
+    }
+
+    function stopGuardCameraScanner() {
+        if (html5QrCodeGuard && state.scannerActive) {
+            html5QrCodeGuard.stop().then(() => {
+                state.scannerActive = false;
+                document.getElementById('btn-start-camera').classList.remove('hidden');
+                document.getElementById('btn-stop-camera').classList.add('hidden');
+            }).catch(err => {});
+        }
+    }
+
+    function startRechargeCameraScanner() {
+        if (typeof Html5Qrcode === 'undefined') return;
+
+        if (!html5QrCodeRecharge) {
+            html5QrCodeRecharge = new Html5Qrcode("recharge-reader");
+        }
+
+        const config = { fps: 15, qrbox: { width: 180, height: 180 } };
+
+        html5QrCodeRecharge.start(
+            { facingMode: "environment" },
+            config,
+            (decodedText) => {
+                fetchCardForRecharge(decodedText);
+                playGrantedSound();
+            },
+            (err) => {}
+        ).then(() => {
+            state.rechargeScannerActive = true;
+            document.getElementById('btn-recharge-camera-start').classList.add('hidden');
+            document.getElementById('btn-recharge-camera-stop').classList.remove('hidden');
+        }).catch(err => alert('Recharge Camera Open Nahi Ho Saka.'));
+    }
+
+    function stopRechargeCameraScanner() {
+        if (html5QrCodeRecharge && state.rechargeScannerActive) {
+            html5QrCodeRecharge.stop().then(() => {
+                state.rechargeScannerActive = false;
+                document.getElementById('btn-recharge-camera-start').classList.remove('hidden');
+                document.getElementById('btn-recharge-camera-stop').classList.add('hidden');
+            }).catch(err => {});
+        }
+    }
+
+    // ----------------------------------------------------------------------
+    // 7. DEDICATED RECHARGE TOOL LOGIC
+    // ----------------------------------------------------------------------
+    function fetchCardForRecharge(cardId) {
+        const card = state.cards.find(c => c.id.toUpperCase() === cardId.trim().toUpperCase());
+        const resultContainer = document.getElementById('recharge-card-result');
+
+        if (!card) {
+            alert(`❌ Card ID "${cardId}" Firebase Database Mein Nahi Mil Saka!`);
+            resultContainer.classList.add('hidden');
+            return;
+        }
+
+        state.rechargeTargetCardId = card.id;
+
+        document.getElementById('rc-name').textContent = card.name;
+        document.getElementById('rc-id').textContent = card.id;
+        document.getElementById('rc-phone').textContent = card.phone;
+        document.getElementById('rc-balance').textContent = `Rs. ${card.balance}`;
+
+        resultContainer.classList.remove('hidden');
+    }
+
+    document.getElementById('btn-confirm-recharge').addEventListener('click', () => {
+        if (!state.rechargeTargetCardId) return;
+
+        const amountInput = document.getElementById('recharge-amount-input');
+        const amount = parseFloat(amountInput.value);
+
+        if (isNaN(amount) || amount <= 0) {
+            alert('Sahi Recharge Amount enter karein.');
+            return;
+        }
+
+        const card = state.cards.find(c => c.id === state.rechargeTargetCardId);
+        if (card) {
+            card.balance += amount;
+            card.initialBalance = (card.initialBalance || 0) + amount;
+            
+            syncCardToCloud(card);
+            playGrantedSound();
+
+            document.getElementById('rc-balance').textContent = `Rs. ${card.balance}`;
+            alert(`⚡ FIREBASE CLOUD RECHARGE SUCCESSFUL!\nPassenger: ${card.name}\nNaya Balance: Rs. ${card.balance}`);
+        }
     });
 
-    // Handle installed completion callback
-    window.addEventListener('appinstalled', (evt) => {
-        console.log('VoiceCalc was successfully installed!');
-        pwaInstallOverlay.classList.add('hidden');
-        deferredPrompt = null;
+    document.getElementById('btn-recharge-search-id').addEventListener('click', () => {
+        const idVal = document.getElementById('recharge-search-id').value;
+        if (idVal) fetchCardForRecharge(idVal);
     });
-}
+
+    document.getElementById('recharge-select-card').addEventListener('change', (e) => {
+        if (e.target.value) fetchCardForRecharge(e.target.value);
+    });
+
+    // ----------------------------------------------------------------------
+    // 8. UI RENDER & SIDEBAR ROUTER
+    // ----------------------------------------------------------------------
+    function renderApp() {
+        // Stats
+        document.getElementById('stat-total-cards').textContent = state.cards.length;
+        
+        let totalRevenue = 0;
+        state.cards.forEach(c => {
+            totalRevenue += (c.initialBalance || c.balance || 0);
+        });
+        document.getElementById('stat-total-revenue').textContent = `Rs. ${totalRevenue}`;
+        
+        const inTransitCount = state.cards.filter(c => c.status === 'IN_TRANSIT').length;
+        document.getElementById('stat-in-transit').textContent = inTransitCount;
+
+        // Recharge Select Dropdown
+        const rechargeSelect = document.getElementById('recharge-select-card');
+        if (rechargeSelect) {
+            rechargeSelect.innerHTML = '<option value="">-- Card Select Karein --</option>' +
+                state.cards.map(c => `<option value="${c.id}">${c.name} (${c.id}) - Balance: Rs. ${c.balance}</option>`).join('');
+        }
+
+        // Render Cards Gallery
+        const galleryGrid = document.getElementById('qr-gallery-grid');
+        if (galleryGrid) {
+            if (state.cards.length === 0) {
+                galleryGrid.innerHTML = `<div style="grid-column: 1/-1; text-align:center; padding:30px; color:#8e9bb0;">Abhi tak koi card issue nahi hua. "Issue New Card" tab par ja kar naya card banayein!</div>`;
+            } else {
+                galleryGrid.innerHTML = state.cards.map(c => `
+                    <div class="gallery-card-item">
+                        <div class="gallery-qr-wrapper" id="gallery-qr-${c.id}"></div>
+                        <div class="gallery-card-details">
+                            <h4>${c.name}</h4>
+                            <p>ID: <strong>${c.id}</strong></p>
+                            <span class="bal-badge" style="color: ${c.balance >= FARE_PER_SCAN ? '#00e676' : '#ff1744'};">
+                                Balance: Rs. ${c.balance}
+                            </span>
+                        </div>
+                    </div>
+                `).join('');
+
+                state.cards.forEach(c => {
+                    generateQRCode(`gallery-qr-${c.id}`, c.id, 120);
+                });
+            }
+        }
+
+        // Database Table Body
+        const tbody = document.getElementById('cards-table-body');
+        if (tbody) {
+            if (state.cards.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="6" style="text-align:center; color:#8e9bb0; padding:20px;">Firebase Cloud DB Mein Koi Record Nahi Hai. Pehla card banayein!</td></tr>`;
+            } else {
+                tbody.innerHTML = state.cards.map(c => `
+                    <tr>
+                        <td><strong>${c.id}</strong></td>
+                        <td>${c.name}</td>
+                        <td>${c.phone}</td>
+                        <td><strong style="color:#00e676;">Rs. ${c.balance}</strong></td>
+                        <td>
+                            <span class="status-badge ${c.status === 'IN_TRANSIT' ? 'status-transit' : 'status-active'}">
+                                ${c.status === 'IN_TRANSIT' ? 'IN TRANSIT 🚌' : 'COMPLETED ✅'}
+                            </span>
+                        </td>
+                        <td>
+                            <button class="btn btn-outline btn-view-card" data-card-id="${c.id}" style="padding:4px 10px; font-size:0.75rem;">
+                                <i class="fa-solid fa-qrcode"></i> View Card
+                            </button>
+                        </td>
+                    </tr>
+                `).join('');
+
+                tbody.querySelectorAll('.btn-view-card').forEach(btn => {
+                    btn.addEventListener('click', () => {
+                        const id = btn.getAttribute('data-card-id');
+                        switchAdminTab('issue');
+                        displayCardPreview(id);
+                    });
+                });
+            }
+        }
+
+        // Render Default Preview Card
+        if (state.cards.length > 0) {
+            const activeId = state.activeCardId || state.cards[state.cards.length - 1].id;
+            displayCardPreview(activeId);
+        } else {
+            document.getElementById('preview-user-name').textContent = 'No Card Created';
+            document.getElementById('preview-card-id').textContent = 'GL-CARD-XXXX';
+            document.getElementById('preview-card-phone').textContent = '03XX-XXXXXXX';
+            document.getElementById('preview-card-balance').textContent = 'Rs. 0';
+            document.getElementById('preview-qr-code').innerHTML = '';
+        }
+    }
+
+    function displayCardPreview(cardId) {
+        const card = state.cards.find(c => c.id === cardId);
+        if (!card) return;
+
+        state.activeCardId = cardId;
+
+        document.getElementById('preview-user-name').textContent = card.name;
+        document.getElementById('preview-card-id').textContent = card.id;
+        document.getElementById('preview-card-phone').textContent = card.phone;
+        document.getElementById('preview-card-balance').textContent = `Rs. ${card.balance}`;
+        
+        const statusEl = document.getElementById('preview-card-status');
+        if (card.status === 'IN_TRANSIT') {
+            statusEl.textContent = 'IN TRANSIT 🚌';
+            statusEl.className = 'status-badge status-transit';
+        } else {
+            statusEl.textContent = 'ACTIVE ✅';
+            statusEl.className = 'status-badge status-active';
+        }
+
+        generateQRCode('preview-qr-code', card.id, 95);
+    }
+
+    function switchAdminTab(tabName) {
+        state.activeAdminTab = tabName;
+
+        const navBtns = {
+            dash: document.getElementById('nav-dash'),
+            issue: document.getElementById('nav-issue'),
+            recharge: document.getElementById('nav-recharge'),
+            gallery: document.getElementById('nav-gallery')
+        };
+
+        const pages = {
+            dash: document.getElementById('tab-dash-content'),
+            issue: document.getElementById('tab-issue-content'),
+            recharge: document.getElementById('tab-recharge-content'),
+            gallery: document.getElementById('tab-gallery-content')
+        };
+
+        Object.keys(navBtns).forEach(k => {
+            if (k === tabName) {
+                navBtns[k].classList.add('active');
+                pages[k].classList.remove('hidden');
+            } else {
+                navBtns[k].classList.remove('active');
+                pages[k].classList.add('hidden');
+            }
+        });
+
+        if (tabName !== 'recharge') {
+            stopRechargeCameraScanner();
+        }
+    }
+
+    document.getElementById('nav-dash').addEventListener('click', () => switchAdminTab('dash'));
+    document.getElementById('nav-issue').addEventListener('click', () => switchAdminTab('issue'));
+    document.getElementById('nav-recharge').addEventListener('click', () => switchAdminTab('recharge'));
+    document.getElementById('nav-gallery').addEventListener('click', () => switchAdminTab('gallery'));
+
+    // Print Card
+    document.getElementById('btn-print-card').addEventListener('click', () => {
+        const activeId = state.activeCardId || (state.cards.length > 0 ? state.cards[0].id : null);
+        if (!activeId) {
+            alert('Pehle Naya Card Issue Karein.');
+            return;
+        }
+
+        const card = state.cards.find(c => c.id === activeId);
+        if (!card) return;
+
+        const printArea = document.getElementById('printable-card-area');
+        printArea.innerHTML = `
+            <div class="smart-pvc-card" style="background:#0b1c38; border:3px solid #00e676; padding:20px; color:#fff; font-family:sans-serif; width:380px; border-radius:16px;">
+                <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid #444; padding-bottom:8px;">
+                    <strong style="color:#00e676; font-size:14px;">KARACHI GREEN LINE BRT</strong>
+                    <span style="background:#ffd700; color:#000; font-size:10px; font-weight:bold; padding:2px 6px; border-radius:8px;">OFFICIAL PASS</span>
+                </div>
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-top:14px;">
+                    <div>
+                        <h3 style="margin:0; font-size:18px;">${card.name}</h3>
+                        <p style="margin:4px 0; font-size:12px; color:#aaa;">Card ID: <b>${card.id}</b></p>
+                        <p style="margin:2px 0; font-size:12px; color:#aaa;">Phone: ${card.phone}</p>
+                        <div style="margin-top:8px; background:rgba(0,230,118,0.2); color:#00e676; padding:4px 8px; border-radius:6px; font-weight:bold; font-size:13px; display:inline-block;">
+                            INITIAL BALANCE: Rs. ${card.balance}
+                        </div>
+                    </div>
+                    <div id="print-qr-target" style="background:#fff; padding:6px; border-radius:8px;"></div>
+                </div>
+            </div>
+        `;
+
+        generateQRCode('print-qr-target', card.id, 100);
+
+        setTimeout(() => {
+            window.print();
+        }, 300);
+    });
+
+    // ----------------------------------------------------------------------
+    // 9. EVENT LISTENERS
+    // ----------------------------------------------------------------------
+    document.getElementById('gate-mode-entry').addEventListener('click', () => {
+        state.gateMode = 'ENTRY';
+        document.getElementById('gate-mode-entry').classList.add('active');
+        document.getElementById('gate-mode-exit').classList.remove('active');
+    });
+
+    document.getElementById('gate-mode-exit').addEventListener('click', () => {
+        state.gateMode = 'EXIT';
+        document.getElementById('gate-mode-exit').classList.add('active');
+        document.getElementById('gate-mode-entry').classList.remove('active');
+    });
+
+    document.getElementById('btn-manual-scan').addEventListener('click', () => {
+        const inputVal = document.getElementById('manual-qr-input').value;
+        if (inputVal) {
+            processGuardScan(inputVal);
+            document.getElementById('manual-qr-input').value = '';
+        }
+    });
+
+    document.getElementById('btn-start-camera').addEventListener('click', startGuardCameraScanner);
+    document.getElementById('btn-stop-camera').addEventListener('click', stopGuardCameraScanner);
+
+    document.getElementById('btn-recharge-camera-start').addEventListener('click', startRechargeCameraScanner);
+    document.getElementById('btn-recharge-camera-stop').addEventListener('click', stopRechargeCameraScanner);
+
+    const btnGuardMode = document.getElementById('btn-guard-mode');
+    const btnAdminMode = document.getElementById('btn-admin-mode');
+    const guardView = document.getElementById('guard-view');
+    const adminView = document.getElementById('admin-view');
+    const pinModal = document.getElementById('pin-modal');
+    const pinInput = document.getElementById('pin-input');
+
+    btnGuardMode.addEventListener('click', () => {
+        state.activeView = 'GUARD';
+        btnGuardMode.classList.add('active');
+        btnAdminMode.classList.remove('active');
+        guardView.classList.remove('hidden');
+        adminView.classList.add('hidden');
+        stopRechargeCameraScanner();
+    });
+
+    btnAdminMode.addEventListener('click', () => {
+        pinModal.classList.remove('hidden');
+        pinInput.value = '';
+        pinInput.focus();
+    });
+
+    document.getElementById('btn-cancel-pin').addEventListener('click', () => {
+        pinModal.classList.add('hidden');
+    });
+
+    document.getElementById('btn-verify-pin').addEventListener('click', verifyAdminPin);
+    pinInput.addEventListener('keypress', (e) => {
+        if (e.key === 'Enter') verifyAdminPin();
+    });
+
+    function verifyAdminPin() {
+        if (pinInput.value === ADMIN_PIN_DEFAULT) {
+            pinModal.classList.add('hidden');
+            state.activeView = 'ADMIN';
+            btnAdminMode.classList.add('active');
+            btnGuardMode.classList.remove('active');
+            adminView.classList.remove('hidden');
+            guardView.classList.add('hidden');
+            stopGuardCameraScanner();
+        } else {
+            alert('❌ Galat PIN Code! Sahi Admin PIN daalein (Default: 1234).');
+            pinInput.value = '';
+            pinInput.focus();
+        }
+    }
+
+    // Create Card Form
+    document.getElementById('form-create-card').addEventListener('submit', (e) => {
+        e.preventDefault();
+
+        const name = document.getElementById('card-user-name').value.trim();
+        const phone = document.getElementById('card-user-phone').value.trim();
+        const cnic = document.getElementById('card-user-cnic').value.trim();
+        const initialBal = parseFloat(document.getElementById('card-initial-balance').value);
+
+        const newId = `GL-CARD-${1001 + state.cards.length}`;
+
+        const newCard = {
+            id: newId,
+            name: name,
+            phone: phone,
+            cnic: cnic || 'N/A',
+            balance: initialBal,
+            initialBalance: initialBal,
+            status: 'COMPLETED',
+            createdAt: new Date().toLocaleDateString()
+        };
+
+        syncCardToCloud(newCard);
+        state.activeCardId = newId;
+
+        playGrantedSound();
+        alert(`✅ FIREBASE REAL-TIME CLOUD CARD ISSUED!\nCard ID: ${newId}\nBalance: Rs. ${initialBal}`);
+        document.getElementById('form-create-card').reset();
+    });
+
+    // Initialize Store & Firebase listener
+    initStore();
+});

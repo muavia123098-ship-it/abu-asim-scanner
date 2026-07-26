@@ -1,349 +1,408 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="ur">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>VoiceCalc - Hands-Free Voice Calculator</title>
-    
-    <!-- PWA & Mobile Web App Meta Tags -->
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Karachi Green Line BRT - Firebase PWA Smart System</title>
+    <!-- PWA Manifest & Theme Color -->
+    <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#00e676">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-    <meta name="theme-color" content="#0a0b10">
-    <link rel="manifest" href="manifest.json">
-    <link rel="apple-touch-icon" href="icon-192.png">
+    <meta name="apple-mobile-web-app-title" content="GreenLine BRT">
 
     <!-- Google Fonts -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&family=Space+Grotesk:wght@400;500;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
-    
-    <!-- Custom Style Sheet -->
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <!-- FontAwesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Style CSS -->
     <link rel="stylesheet" href="style.css">
+    <!-- QRCode JS Library -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+    <!-- HTML5 QR Code Scanner Library -->
+    <script src="https://unpkg.com/html5-qrcode" type="text/javascript"></script>
+
+    <!-- FIREBASE COMPAT SDKs -->
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
 </head>
 <body>
-    <!-- Fullscreen PWA Install Onboarding Overlay -->
-    <div id="pwa-install-overlay" class="pwa-install-overlay hidden">
-        <div class="ambient-glow glow-1"></div>
-        <div class="ambient-glow glow-2"></div>
+    <!-- Printable Area -->
+    <div id="printable-card-area" class="printable-area"></div>
+
+    <!-- App Container -->
+    <div id="app" class="app-container">
         
-        <div class="install-card">
-            <div class="install-header">
-                <span class="install-logo">🎙️</span>
-                <h2>Voice<span class="gradient-text">Calc</span></h2>
-                <p class="install-tagline">Hands-Free Voice Calculator</p>
+        <!-- Top Header Navigation Bar -->
+        <header class="app-header">
+            <div class="brand">
+                <div class="logo-icon">
+                    <i class="fa-solid fa-bus-simple"></i>
+                </div>
+                <div class="brand-text">
+                    <h1>GREEN LINE BRT</h1>
+                    <span class="sub-text" id="cloud-status-tag"><i class="fa-solid fa-cloud"></i> FIREBASE REAL-TIME CLOUD</span>
+                </div>
             </div>
             
-            <div class="install-benefits">
-                <div class="benefit-item">
-                    <span class="benefit-icon">🎙️</span>
-                    <div class="benefit-text">
-                        <h3>Full Voice Control</h3>
-                        <p>No fingers needed. Speak, calculate, and get audio responses instantly.</p>
-                    </div>
-                </div>
-                <div class="benefit-item">
-                    <span class="benefit-icon">⚡</span>
-                    <div class="benefit-text">
-                        <h3>Offline Capability</h3>
-                        <p>Works 100% offline without requiring any internet connection.</p>
-                    </div>
-                </div>
-                <div class="benefit-item">
-                    <span class="benefit-icon">📱</span>
-                    <div class="benefit-text">
-                        <h3>Native Experience</h3>
-                        <p>Launches in full screen from your home screen just like a native app.</p>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Dynamic Install Button -->
-            <button id="pwa-install-btn" class="install-btn">
-                <span>Install VoiceCalc Now</span>
-                <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.5" style="margin-left: 8px;"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg>
-            </button>
-
-            <!-- iOS Instruction Box (Hidden by default, shown on Safari/iOS) -->
-            <div id="ios-install-instructions" class="ios-instructions hidden">
-                <p><strong>To install on iOS:</strong> Tap the Share button <span class="ios-icon">📤</span> in Safari, scroll down and select <strong>"Add to Home Screen"</strong> <span class="ios-icon">➕</span>.</p>
-            </div>
-
-            <button id="pwa-skip-btn" class="skip-btn">Continue in Browser</button>
-        </div>
-    </div>
-
-    <div class="app-container">
-        <!-- Dynamic Glow Backgrounds -->
-        <div class="ambient-glow glow-1"></div>
-        <div class="ambient-glow glow-2"></div>
-
-        <!-- Header Panel -->
-        <header class="app-header">
-            <div class="logo">
-                <span class="logo-icon">🎙️</span>
-                <h1>Voice<span class="gradient-text">Calc</span></h1>
-            </div>
-            <div class="header-actions">
-                <button id="history-btn" class="header-btn" title="Calculation History">
-                    <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+            <div class="header-right-actions">
+                <!-- PWA Mobile Install App Button -->
+                <button id="btn-install-pwa" class="btn btn-gold btn-install-app hidden">
+                    <i class="fa-solid fa-download"></i> 📲 App Install Karein
                 </button>
-                <button id="settings-btn" class="header-btn" title="Settings">
-                    <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 11-2.83 2.83l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 11-2.83-2.83l.06-.06a1.65 1.65 0 00.33-1.82 1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 112.83-2.83l.06.06a1.65 1.65 0 001.82.33H9a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 112.83 2.83l-.06.06a1.65 1.65 0 00-.33 1.82V9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"></path></svg>
-                </button>
+
+                <div class="mode-switch-container">
+                    <button id="btn-guard-mode" class="mode-btn active">
+                        <i class="fa-solid fa-qrcode"></i> Guard Scanner Tool
+                    </button>
+                    <button id="btn-admin-mode" class="mode-btn">
+                        <i class="fa-solid fa-lock"></i> Admin Panel
+                    </button>
+                </div>
             </div>
         </header>
 
-        <!-- Main Display Panel -->
-        <main class="display-panel">
-            <!-- Active Info Banner (Mic Status or Language Indicator) -->
-            <div class="status-indicator-bar">
-                <span id="mic-status-badge" class="badge badge-inactive">Offline</span>
-                <span id="lang-status-badge" class="badge">English</span>
+        <!-- Signal Overlay for Full Screen Scan Feedback (Green / Red) -->
+        <div id="signal-overlay" class="signal-overlay hidden">
+            <div class="signal-content">
+                <div id="signal-icon" class="signal-icon"></div>
+                <h2 id="signal-title">ACCESS GRANTED</h2>
+                <p id="signal-msg">Balance Deducted: Rs. 25</p>
+                <div id="signal-card-info" class="signal-card-info"></div>
             </div>
+        </div>
 
-            <!-- Calculation Views -->
-            <div class="screens-wrapper">
-                <!-- Expression Formula Display -->
-                <div id="display-expression" class="display-expression" placeholder="Boliye: 200 + 350..."></div>
-                
-                <!-- Large Real-time Result / Running Value Display -->
-                <div id="display-result" class="display-result">0</div>
-                
-                <!-- Live Voice Speech Transcription Feed -->
-                <div class="transcription-container">
-                    <span id="transcription-text" class="transcription-text">Press Mic & Speak...</span>
+        <!-- MAIN VIEW 1: GUARD SCANNER TOOL (DEFAULT GUARD VIEW) -->
+        <main id="guard-view" class="view-section active">
+            <div class="scanner-hero">
+                <div class="scanner-header-info">
+                    <span class="badge badge-live"><i class="fa-solid fa-cloud-arrow-down"></i> LIVE CLOUD SCANNER ACTIVE</span>
+                    <span class="station-name"><i class="fa-solid fa-location-dot"></i> Surjani Town Terminal</span>
+                </div>
+
+                <!-- Scanner Mode Selector: Entry vs Exit -->
+                <div class="gate-mode-selector">
+                    <button id="gate-mode-entry" class="gate-tab active">
+                        <i class="fa-solid fa-right-to-bracket"></i> ENTRY GATE (داخلی گیٹ)
+                        <span class="fare-tag">Deducts Rs. 25</span>
+                    </button>
+                    <button id="gate-mode-exit" class="gate-tab">
+                        <i class="fa-solid fa-right-from-bracket"></i> EXIT GATE (خارجی گیٹ)
+                        <span class="fare-tag">Deducts Rs. 25</span>
+                    </button>
+                </div>
+
+                <!-- Live Mobile Camera Frame -->
+                <div class="camera-card">
+                    <div class="scanner-frame-wrapper">
+                        <div id="reader"></div>
+                        <div class="scan-laser"></div>
+                        <div class="scanner-corners">
+                            <span></span><span></span><span></span><span></span>
+                        </div>
+                    </div>
+                    <div class="camera-controls">
+                        <button id="btn-start-camera" class="btn btn-emerald btn-block">
+                            <i class="fa-solid fa-camera"></i> Guard Mobile Camera Scanner Open Karein
+                        </button>
+                        <button id="btn-stop-camera" class="btn btn-outline btn-block hidden">
+                            <i class="fa-solid fa-video-slash"></i> Camera Stop Karein
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Manual Card ID Search -->
+                <div class="manual-input-box">
+                    <label for="manual-qr-input"><i class="fa-solid fa-keyboard"></i> Manual Search:</label>
+                    <div class="manual-input-row">
+                        <input type="text" id="manual-qr-input" placeholder="e.g. GL-CARD-1001">
+                        <button id="btn-manual-scan" class="btn btn-primary">
+                            <i class="fa-solid fa-bolt"></i> Scan Card ID
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Live Gate History Log -->
+                <div class="scan-history-box">
+                    <h3><i class="fa-solid fa-clock-rotate-left"></i> Live Gate Log (Cloud Synced)</h3>
+                    <div class="history-list" id="scan-history-list">
+                        <div class="empty-state">Abhi tak koi scan record nahi hua.</div>
+                    </div>
                 </div>
             </div>
         </main>
 
-        <!-- Dynamic Equalizer / Audio Feedback Panel (Visible only when listening) -->
-        <div class="visualizer-panel" id="visualizer-panel">
-            <div class="audio-waves" id="audio-waves">
-                <span></span><span></span><span></span><span></span><span></span><span></span><span></span>
+        <!-- MAIN VIEW 2: ADMIN PANEL WITH SIDEBAR NAVIGATION (PIN PROTECTED) -->
+        <main id="admin-view" class="view-section hidden">
+            <div class="admin-layout">
+                
+                <!-- Admin Sidebar Navigation -->
+                <aside class="admin-sidebar">
+                    <div class="sidebar-header">
+                        <i class="fa-solid fa-user-shield"></i> ADMIN MENU
+                    </div>
+                    <nav class="sidebar-menu">
+                        <button id="nav-dash" class="nav-item active">
+                            <i class="fa-solid fa-chart-pie"></i> Dashboard Overview
+                        </button>
+                        <button id="nav-issue" class="nav-item">
+                            <i class="fa-solid fa-address-card"></i> Issue New Card
+                        </button>
+                        <button id="nav-recharge" class="nav-item">
+                            <i class="fa-solid fa-bolt-lightning"></i> QR Recharge Tool
+                        </button>
+                        <button id="nav-gallery" class="nav-item">
+                            <i class="fa-solid fa-qrcode"></i> QR Cards Gallery
+                        </button>
+                    </nav>
+                </aside>
+
+                <!-- Admin Main Content Body -->
+                <section class="admin-content">
+                    
+                    <!-- TAB 1: DASHBOARD OVERVIEW -->
+                    <div id="tab-dash-content" class="tab-page active">
+                        <div class="stats-grid">
+                            <div class="stat-card">
+                                <div class="stat-icon icon-cards"><i class="fa-solid fa-id-card"></i></div>
+                                <div class="stat-data">
+                                    <span class="stat-label">Total Cloud Issued Cards</span>
+                                    <h3 id="stat-total-cards">0</h3>
+                                </div>
+                            </div>
+                            <div class="stat-card">
+                                <div class="stat-icon icon-revenue"><i class="fa-solid fa-wallet"></i></div>
+                                <div class="stat-data">
+                                    <span class="stat-label">Total Cloud Revenue</span>
+                                    <h3 id="stat-total-revenue">Rs. 0</h3>
+                                </div>
+                            </div>
+                            <div class="stat-card">
+                                <div class="stat-icon icon-transit"><i class="fa-solid fa-bus"></i></div>
+                                <div class="stat-data">
+                                    <span class="stat-label">In Transit Passengers</span>
+                                    <h3 id="stat-in-transit">0</h3>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Issued Cards Master Table -->
+                        <div class="cards-table-container margin-top-20">
+                            <h2><i class="fa-solid fa-list-check"></i> Firebase Real-Time Cards Database</h2>
+                            <div class="table-responsive">
+                                <table class="data-table">
+                                    <thead>
+                                        <tr>
+                                            <th>Card ID</th>
+                                            <th>Passenger Name</th>
+                                            <th>Mobile Number</th>
+                                            <th>Balance</th>
+                                            <th>Status</th>
+                                            <th>Actions</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="cards-table-body">
+                                        <!-- Dynamic cards from Firebase -->
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- TAB 2: ISSUE NEW SMART CARD -->
+                    <div id="tab-issue-content" class="tab-page hidden">
+                        <div class="issue-page-grid">
+                            
+                            <div class="card-form-box">
+                                <h2><i class="fa-solid fa-plus-circle"></i> Naya Smart QR Card Issue Karein</h2>
+                                <form id="form-create-card">
+                                    <div class="form-group">
+                                        <label for="card-user-name">Passenger Ka Naam:</label>
+                                        <input type="text" id="card-user-name" placeholder="e.g. Ali Ahmed" required>
+                                    </div>
+
+                                    <div class="form-group">
+                                        <label for="card-user-phone">Mobile Number:</label>
+                                        <input type="tel" id="card-user-phone" placeholder="e.g. 0300-1234567" required>
+                                    </div>
+
+                                    <div class="form-group">
+                                        <label for="card-user-cnic">CNIC / Student ID:</label>
+                                        <input type="text" id="card-user-cnic" placeholder="e.g. 42101-XXXXXXX-X">
+                                    </div>
+
+                                    <div class="form-group">
+                                        <label for="card-initial-balance">Initial Recharge Amount (Rs.):</label>
+                                        <select id="card-initial-balance" class="select-input">
+                                            <option value="50">Rs. 50 (Standard Fare)</option>
+                                            <option value="100" selected>Rs. 100 (Recommended)</option>
+                                            <option value="200">Rs. 200 (Weekly Pass)</option>
+                                            <option value="500">Rs. 500 (Monthly Pass)</option>
+                                        </select>
+                                    </div>
+
+                                    <button type="submit" class="btn btn-emerald btn-block">
+                                        <i class="fa-solid fa-cloud-arrow-up"></i> Smart Card Firebase Par Banayein
+                                    </button>
+                                </form>
+                            </div>
+
+                            <!-- Generated Card Preview -->
+                            <div class="card-preview-section">
+                                <div class="section-title-row">
+                                    <h2><i class="fa-solid fa-address-card"></i> Smart PVC Card Preview</h2>
+                                    <button id="btn-print-card" class="btn btn-primary">
+                                        <i class="fa-solid fa-print"></i> Print Card
+                                    </button>
+                                </div>
+
+                                <div id="smart-card-display" class="smart-pvc-card">
+                                    <div class="card-top-bg">
+                                        <div class="card-brand">
+                                            <i class="fa-solid fa-bus-simple"></i> KARACHI GREEN LINE BRT
+                                        </div>
+                                        <span class="card-type-tag">REUSABLE PASS</span>
+                                    </div>
+                                    <div class="card-body-content">
+                                        <div class="card-info">
+                                            <h3 id="preview-user-name">No Card Selected</h3>
+                                            <p class="card-id-text">ID: <span id="preview-card-id">GL-CARD-XXXX</span></p>
+                                            <p class="card-phone-text"><i class="fa-solid fa-phone"></i> <span id="preview-card-phone">03XX-XXXXXXX</span></p>
+                                            <div class="card-balance-badge">
+                                                BALANCE: <span id="preview-card-balance">Rs. 0</span>
+                                            </div>
+                                            <span id="preview-card-status" class="status-badge status-active">ACTIVE</span>
+                                        </div>
+                                        <div class="card-qr-box">
+                                            <div id="preview-qr-code"></div>
+                                            <span class="scan-label">SCAN AT GATE</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                        </div>
+                    </div>
+
+                    <!-- TAB 3: DEDICATED QR CAMERA RECHARGE TOOL -->
+                    <div id="tab-recharge-content" class="tab-page hidden">
+                        <div class="recharge-tool-box">
+                            <h2><i class="fa-solid fa-bolt-lightning"></i> Cloud QR Recharge Station</h2>
+                            <p class="recharge-desc">Card ko Camera se Scan Karein ya neeche Select/Type karke 1-Click Recharge Karein:</p>
+
+                            <!-- Camera Scanner for Admin Recharge -->
+                            <div class="recharge-camera-card">
+                                <div class="scanner-frame-wrapper small-frame">
+                                    <div id="recharge-reader"></div>
+                                    <div class="scan-laser"></div>
+                                </div>
+                                <div class="camera-controls">
+                                    <button id="btn-recharge-camera-start" class="btn btn-emerald btn-block">
+                                        <i class="fa-solid fa-camera"></i> Recharge Camera Scanner Open Karein
+                                    </button>
+                                    <button id="btn-recharge-camera-stop" class="btn btn-outline btn-block hidden">
+                                        <i class="fa-solid fa-video-slash"></i> Camera Stop Karein
+                                    </button>
+                                </div>
+                            </div>
+
+                            <!-- Search / Select Card Input -->
+                            <div class="recharge-select-row">
+                                <div class="form-group flex-1">
+                                    <label for="recharge-select-card">Card Select Karein:</label>
+                                    <select id="recharge-select-card" class="select-input">
+                                        <option value="">-- Card Select Karein --</option>
+                                    </select>
+                                </div>
+                                <div class="form-group flex-1">
+                                    <label for="recharge-search-id">Ya Card ID Manual Enter Karein:</label>
+                                    <div class="input-with-btn">
+                                        <input type="text" id="recharge-search-id" placeholder="e.g. GL-CARD-1001">
+                                        <button id="btn-recharge-search-id" class="btn btn-primary">
+                                            <i class="fa-solid fa-search"></i> Fetch Details
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Fetched Card Details & Recharge Form -->
+                            <div id="recharge-card-result" class="recharge-card-result hidden">
+                                <div class="result-card-header">
+                                    <div class="passenger-details">
+                                        <h3 id="rc-name">Ali Ahmed</h3>
+                                        <p>Card ID: <strong id="rc-id">GL-CARD-1001</strong> | Phone: <span id="rc-phone">0300-1234567</span></p>
+                                    </div>
+                                    <div class="current-bal-box">
+                                        CURRENT BALANCE
+                                        <h2 id="rc-balance">Rs. 100</h2>
+                                    </div>
+                                </div>
+
+                                <div class="recharge-action-form">
+                                    <div class="form-group">
+                                        <label for="recharge-amount-input">Kitna Balance Recharge Karna Hai? (Rs.):</label>
+                                        <input type="number" id="recharge-amount-input" placeholder="e.g. 50, 100, 200, 500" min="10" value="50">
+                                    </div>
+
+                                    <button id="btn-confirm-recharge" class="btn btn-gold btn-block btn-lg">
+                                        <i class="fa-solid fa-cloud-arrow-up"></i> CONFIRM RECHARGE TO CLOUD ⚡
+                                    </button>
+                                </div>
+                            </div>
+
+                        </div>
+                    </div>
+
+                    <!-- TAB 4: ALL ISSUED CARDS QR GALLERY -->
+                    <div id="tab-gallery-content" class="tab-page hidden">
+                        <div class="qr-gallery-section">
+                            <h2><i class="fa-solid fa-qrcode"></i> All Issued Cards QR Gallery</h2>
+                            <p class="gallery-desc">Iss page ko open rakhein aur Guard scanner mobile se har card ka QR Code live scan karke test karein:</p>
+                            <div id="qr-gallery-grid" class="qr-gallery-grid">
+                                <!-- Populated dynamically -->
+                            </div>
+                        </div>
+                    </div>
+
+                </section>
+
             </div>
-        </div>
+        </main>
 
-        <!-- Controls Section -->
-        <section class="controls-panel">
-            <!-- Floating Microphone Circle button -->
-            <div class="mic-container">
-                <button id="mic-trigger-btn" class="mic-btn" aria-label="Toggle Microphone Input">
-                    <div class="mic-glow"></div>
-                    <svg viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="currentColor" stroke-width="2.5" class="mic-icon">
-                        <path d="M12 1v10M19 8v3a7 7 0 01-14 0V8M12 18v5M8 23h8"></path>
-                        <rect x="9" y="1" width="6" height="11" rx="3" fill="currentColor"></rect>
-                    </svg>
-                </button>
-                <div class="mic-tooltip">Tap to speak or say commands</div>
-            </div>
-
-            <!-- Manual Keypad (Slides up/down or acts as immediate interactive fallback) -->
-            <div class="keypad-toggle-bar">
-                <button id="toggle-keypad-btn" class="keypad-toggle-btn">
-                    <span>Show Manual Keypad</span>
-                    <svg class="chevron" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 9l-7 7-7-7"></path></svg>
-                </button>
-            </div>
-
-            <div class="manual-keypad collapsed" id="manual-keypad">
-                <div class="keypad-row">
-                    <button class="key-btn action-key" data-key="clear">AC</button>
-                    <button class="key-btn action-key" data-key="backspace">⌫</button>
-                    <button class="key-btn op-key" data-key="/">÷</button>
-                    <button class="key-btn op-key" data-key="*">×</button>
-                </div>
-                <div class="keypad-row">
-                    <button class="key-btn num-key" data-key="7">7</button>
-                    <button class="key-btn num-key" data-key="8">8</button>
-                    <button class="key-btn num-key" data-key="9">9</button>
-                    <button class="key-btn op-key" data-key="-">−</button>
-                </div>
-                <div class="keypad-row">
-                    <button class="key-btn num-key" data-key="4">4</button>
-                    <button class="key-btn num-key" data-key="5">5</button>
-                    <button class="key-btn num-key" data-key="6">6</button>
-                    <button class="key-btn op-key" data-key="+">+</button>
-                </div>
-                <div class="keypad-row">
-                    <button class="key-btn num-key" data-key="1">1</button>
-                    <button class="key-btn num-key" data-key="2">2</button>
-                    <button class="key-btn num-key" data-key="3">3</button>
-                    <button class="key-btn equal-key" data-key="equals">=</button>
-                </div>
-                <div class="keypad-row">
-                    <button class="key-btn num-key double" data-key="0">0</button>
-                    <button class="key-btn num-key" data-key=".">.</button>
-                </div>
-            </div>
-        </section>
-
-        <!-- Quick Voice Help Sheet Banner -->
-        <footer class="app-footer">
-            <button id="open-guide-btn" class="footer-link">🎙️ How to control with your voice?</button>
-        </footer>
-
-        <!-- Settings Slide-over / Modal Popup -->
-        <div class="overlay hidden" id="settings-overlay">
+        <!-- SECURITY PIN MODAL FOR ADMIN ACCESS -->
+        <div id="pin-modal" class="modal-backdrop hidden">
             <div class="modal-card">
-                <div class="modal-header">
-                    <h2>Voice Settings</h2>
-                    <button class="close-btn" id="close-settings-btn">&times;</button>
+                <div class="modal-icon"><i class="fa-solid fa-shield-halved"></i></div>
+                <h2>Admin Security Access</h2>
+                <p>Admin Panel open karne ke liye 4-Digit Security PIN daalein:</p>
+                
+                <div class="pin-input-group">
+                    <input type="password" id="pin-input" maxlength="4" placeholder="••••" autocomplete="off">
                 </div>
-                <div class="modal-body">
-                    <div class="setting-item">
-                        <div class="setting-info">
-                            <label for="language-select">Voice Recognition Language</label>
-                            <span class="setting-desc">Choose language for voice parsing</span>
-                        </div>
-                        <select id="language-select" class="custom-select">
-                            <option value="en-US">English (US)</option>
-                            <option value="ur-PK">Urdu (Pakistan) / Hinglish</option>
-                            <option value="hi-IN">Hindi (India)</option>
-                        </select>
-                    </div>
-
-                    <div class="setting-item">
-                        <div class="setting-info">
-                            <label for="voice-tts-toggle">Speak Aloud Answers</label>
-                            <span class="setting-desc">Read out calculated values automatically</span>
-                        </div>
-                        <div class="toggle-switch">
-                            <input type="checkbox" id="voice-tts-toggle" checked>
-                            <label for="voice-tts-toggle" class="switch-slider"></label>
-                        </div>
-                    </div>
-
-                    <div class="setting-item">
-                        <div class="setting-info">
-                            <label for="continuous-listening-toggle">Continuous Listening</label>
-                            <span class="setting-desc">Keep mic open during long runs</span>
-                        </div>
-                        <div class="toggle-switch">
-                            <input type="checkbox" id="continuous-listening-toggle" checked>
-                            <label for="continuous-listening-toggle" class="switch-slider"></label>
-                        </div>
-                    </div>
-
-                    <div class="setting-item">
-                        <div class="setting-info">
-                            <label for="haptic-audio-toggle">Sound & Click Effects</label>
-                            <span class="setting-desc">Play feedback tones when parsing sounds</span>
-                        </div>
-                        <div class="toggle-switch">
-                            <input type="checkbox" id="haptic-audio-toggle" checked>
-                            <label for="haptic-audio-toggle" class="switch-slider"></label>
-                        </div>
-                    </div>
+                
+                <p class="pin-hint">Default Admin PIN: <strong>1234</strong></p>
+                
+                <div class="modal-buttons">
+                    <button id="btn-cancel-pin" class="btn btn-outline">Cancel</button>
+                    <button id="btn-verify-pin" class="btn btn-emerald">Unlock Admin</button>
                 </div>
             </div>
         </div>
 
-        <!-- History Drawer -->
-        <div class="overlay hidden" id="history-overlay">
-            <div class="modal-card history-card">
-                <div class="modal-header">
-                    <h2>Calculation History</h2>
-                    <button class="close-btn" id="close-history-btn">&times;</button>
-                </div>
-                <div class="modal-body history-body" id="history-container">
-                    <!-- History calculations injected here -->
-                    <div class="empty-state">
-                        <p>No calculations recorded yet.</p>
-                        <span>Your history will show up here as you make calculations.</span>
-                    </div>
-                </div>
-                <div class="modal-footer">
-                    <button id="clear-history-btn" class="danger-btn">Clear All History</button>
-                </div>
-            </div>
-        </div>
-
-        <!-- Voice Instructions Help Modal -->
-        <div class="overlay hidden" id="guide-overlay">
-            <div class="modal-card guide-card">
-                <div class="modal-header">
-                    <h2>🎙️ Speaking Guide</h2>
-                    <button class="close-btn" id="close-guide-btn-top">&times;</button>
-                </div>
-                <div class="modal-body scrollable">
-                    <h3>How to use Voice Commands</h3>
-                    <p>Simply tap the large glowing Microphone button at the bottom and speak directly! For example:</p>
-
-                    <div class="example-box">
-                        <span class="badge badge-accent">English Example</span>
-                        <div class="phrase">"200 plus 350 plus 1200 minus 300 equal"</div>
-                        <div class="parsed-preview">Calculates: <code>200 + 350 + 1200 - 300 = 1450</code></div>
-                    </div>
-
-                    <div class="example-box">
-                        <span class="badge badge-accent">Urdu/Hindi Example</span>
-                        <div class="phrase">"nau sau jamah do sau nifi pachas barabar"</div>
-                        <div class="parsed-preview">Calculates: <code>900 + 200 - 50 = 1050</code></div>
-                    </div>
-
-                    <h3>Supported Spoken Keywords</h3>
-                    <table class="voice-table">
-                        <thead>
-                            <tr>
-                                <th>Math Operation</th>
-                                <th>English Keywords</th>
-                                <th>Urdu/Hindi Keywords</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            <tr>
-                                <td><strong>Add (+)</strong></td>
-                                <td>"plus", "add", "and"</td>
-                                <td>"jamah", "jama", "جمع"</td>
-                            </tr>
-                            <tr>
-                                <td><strong>Subtract (-)</strong></td>
-                                <td>"minus", "subtract"</td>
-                                <td>"nifi", "nifee", "manfi", "tafreeq"</td>
-                            </tr>
-                            <tr>
-                                <td><strong>Multiply (*)</strong></td>
-                                <td>"times", "into", "multiply", "multiplied by"</td>
-                                <td>"zarb", " ضرب"</td>
-                            </tr>
-                            <tr>
-                                <td><strong>Divide (/)</strong></td>
-                                <td>"divide", "divided by", "over"</td>
-                                <td>"takseem", "تقسیم"</td>
-                            </tr>
-                            <tr>
-                                <td><strong>Calculate (=)</strong></td>
-                                <td>"equal", "equals", "equal to"</td>
-                                <td>"barabar", "برابر"</td>
-                            </tr>
-                            <tr>
-                                <td><strong>Clear (AC)</strong></td>
-                                <td>"clear", "all clear", "reset"</td>
-                                <td>"saaf karein", "khatam karein"</td>
-                            </tr>
-                        </tbody>
-                    </table>
-
-                    <div class="guide-note">
-                        <strong>💡 Pro-Tip:</strong> The app will automatically show a live preview of what you are saying at the bottom, so you can see if it parses your numbers correctly as you speak!
-                    </div>
-                </div>
-                <div class="modal-footer">
-                    <button class="success-btn" id="close-guide-btn-bottom">Got it, Let's Start!</button>
-                </div>
-            </div>
-        </div>
     </div>
 
-    <!-- Core App Logic -->
+    <!-- Application Script -->
     <script src="app.js"></script>
+
+    <!-- Register PWA Service Worker -->
     <script>
-        // Register PWA Service Worker for offline capabilities
         if ('serviceWorker' in navigator) {
             window.addEventListener('load', () => {
-                navigator.serviceWorker.register('sw.js')
-                    .then(registration => console.log('ServiceWorker registered with scope:', registration.scope))
-                    .catch(error => console.error('ServiceWorker registration failed:', error));
+                navigator.serviceWorker.register('./sw.js')
+                    .then(reg => console.log('🟢 PWA Service Worker Registered Successfully!'))
+                    .catch(err => console.log('PWA SW Register Error:', err));
             });
         }
     </script>
