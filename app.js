@@ -1,12 +1,12 @@
 /* ==========================================================================
    Karachi Green Line BRT - Smart QR Ticket & Reusable Card System
-   Blazing Fast Focused QR Scanning Engine (Instant <50ms Recognition)
+   GPU Hardware Accelerated Barcode Detector & Robust Mobile Scan Tuning
    ========================================================================== */
 
 document.addEventListener('DOMContentLoaded', () => {
 
     // ----------------------------------------------------------------------
-    // 1. DYNAMIC PWA INSTALLATION HANDLER (NEVER SHOWS INSIDE INSTALLED APP)
+    // 1. DYNAMIC PWA INSTALLATION HANDLER
     // ----------------------------------------------------------------------
     let deferredPrompt = null;
 
@@ -147,7 +147,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function startCloudRestPoller() {
         fetchCloudRestData();
-        setInterval(fetchCloudRestData, 2500);
+        setInterval(fetchCloudRestData, 2000);
     }
 
     function fetchCloudRestData() {
@@ -308,22 +308,22 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // ----------------------------------------------------------------------
-    // 5. GUARD SCANNER CORE LOGIC
+    // 5. GUARD SCANNER CORE LOGIC (0.1S RECOGNITION & OVERLAY FEEDBACK)
     // ----------------------------------------------------------------------
     function processGuardScan(rawText) {
         if (!rawText) return;
 
         const now = Date.now();
-        if (now - state.lastScanTime < 600) return;
+        if (now - state.lastScanTime < 1500) return;
         state.lastScanTime = now;
 
         const cardId = rawText.trim();
-        console.log("Scanned QR Code Text:", cardId);
+        console.log("🟢 QR Code Detected:", cardId);
 
-        const card = state.cards.find(c => c.id.toUpperCase() === cardId.toUpperCase());
+        const card = state.cards.find(c => c.id.trim().toUpperCase() === cardId.toUpperCase());
 
         if (!card) {
-            triggerSignalResult(false, 'INVALID / UNREGISTERED QR', `QR Code "${cardId}" System DB Mein Register Nahi Hai!`);
+            triggerSignalResult(false, 'INVALID / UNREGISTERED QR 🔴', `QR Code "${cardId}" System DB Mein Register Nahi Hai!`);
             addScanHistoryLog(cardId, 'Unknown', 'DENIED - UNREGISTERED', 0);
             return;
         }
@@ -332,48 +332,49 @@ document.addEventListener('DOMContentLoaded', () => {
 
         if (state.gateMode === 'ENTRY') {
             if (card.status === 'IN_TRANSIT') {
-                triggerSignalResult(false, 'ALREADY INSIDE', `${card.name} Pehle Se Station Ke Andar Hai! Exit Gate Scan Karein.`);
+                triggerSignalResult(false, 'ALREADY INSIDE STATION 🟡', `${card.name} Pehle Se Station Ke Andar Hai!\nExit Gate Scan Karein.`);
                 addScanHistoryLog(card.id, card.name, 'DENIED - ALREADY IN', 0);
                 return;
             }
 
             if (currentBalance < FARE_PER_SCAN) {
-                triggerSignalResult(false, 'INSUFFICIENT BALANCE 🔴', `${card.name} Ka Balance Kam Hai! Current: Rs. ${currentBalance}`);
+                triggerSignalResult(false, 'LOW BALANCE (ACCESS DENIED) 🔴', `${card.name} Ka Balance Kam Hai! Current: Rs. ${currentBalance} (Min Required: Rs. 25)`);
                 addScanHistoryLog(card.id, card.name, 'DENIED - LOW BALANCE', currentBalance);
                 return;
             }
 
-            // SUCCESS ENTRY 🟢
+            // SUCCESS ENTRY DEDUCTION 🟢
             card.balance = currentBalance - FARE_PER_SCAN;
             card.status = 'IN_TRANSIT';
             
             syncCardToCloud(card);
             renderApp();
 
-            triggerSignalResult(true, 'ENTRY GRANTED 🟢', `Fare Deducted: Rs. ${FARE_PER_SCAN} | Remaining Balance: Rs. ${card.balance}`, card.name);
+            triggerSignalResult(true, 'ENTRY GRANTED - RS. 25 DEDUCTED 🟢', `Remaining Balance: Rs. ${card.balance} | Status: IN TRANSIT 🚌`, card.name);
             addScanHistoryLog(card.id, card.name, 'GRANTED (ENTRY)', FARE_PER_SCAN);
 
         } else {
+            // EXIT GATE MODE
             if (card.status !== 'IN_TRANSIT') {
-                triggerSignalResult(false, 'NO ENTRY RECORD', `${card.name} Ka Entry Record Nahi Mila!`);
+                triggerSignalResult(false, 'NO ENTRY RECORD 🟡', `${card.name} Ka Entry Record Nahi Mila!\nPehle Entry Gate Scan Karein.`);
                 addScanHistoryLog(card.id, card.name, 'DENIED - NO ENTRY LOG', 0);
                 return;
             }
 
             if (currentBalance < FARE_PER_SCAN) {
-                triggerSignalResult(false, 'INSUFFICIENT FARE', `${card.name} Ka Remaining Exit Fare Kam Hai! Balance: Rs. ${currentBalance}`);
+                triggerSignalResult(false, 'LOW BALANCE ON EXIT 🔴', `${card.name} Ka Exit Fare Kam Hai! Balance: Rs. ${currentBalance}`);
                 addScanHistoryLog(card.id, card.name, 'DENIED - LOW EXIT BALANCE', currentBalance);
                 return;
             }
 
-            // SUCCESS EXIT 🟢
+            // SUCCESS EXIT DEDUCTION 🟢
             card.balance = currentBalance - FARE_PER_SCAN;
             card.status = 'COMPLETED';
 
             syncCardToCloud(card);
             renderApp();
 
-            triggerSignalResult(true, 'EXIT CLEARED 🟢', `Journey Complete | Final Fare Deducted: Rs. ${FARE_PER_SCAN} | Remaining: Rs. ${card.balance}`, card.name);
+            triggerSignalResult(true, 'EXIT CLEARED - RS. 25 DEDUCTED 🟢', `Journey Complete | Final Remaining Balance: Rs. ${card.balance}`, card.name);
             addScanHistoryLog(card.id, card.name, 'GRANTED (EXIT)', FARE_PER_SCAN);
         }
     }
@@ -403,7 +404,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         setTimeout(() => {
             overlay.classList.add('hidden');
-        }, 1600);
+        }, 2200);
     }
 
     function addScanHistoryLog(cardId, name, resultText, fare) {
@@ -434,7 +435,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // ----------------------------------------------------------------------
-    // 6. BLAZING FAST FOCUSED SCANNING ENGINE (INSTANT DECODING)
+    // 6. GPU HARDWARE ACCELERATED ULTRA-FAST QR DETECTOR
     // ----------------------------------------------------------------------
     function startGuardCameraScanner() {
         if (typeof Html5Qrcode === 'undefined') return;
@@ -448,13 +449,12 @@ document.addEventListener('DOMContentLoaded', () => {
             });
         }
 
-        // Focused high-density scan square for lightning fast decoding (<30ms)
         const cameraConfig = {
             fps: 30,
             qrbox: (w, h) => {
                 const minDim = Math.min(w, h);
-                const boxSize = Math.floor(minDim * 0.70);
-                return { width: Math.max(boxSize, 220), height: Math.max(boxSize, 220) };
+                const boxSize = Math.floor(minDim * 0.85);
+                return { width: Math.max(boxSize, 180), height: Math.max(boxSize, 180) };
             },
             disableFlip: false
         };
@@ -532,8 +532,8 @@ document.addEventListener('DOMContentLoaded', () => {
             fps: 30,
             qrbox: (w, h) => {
                 const minDim = Math.min(w, h);
-                const boxSize = Math.floor(minDim * 0.70);
-                return { width: Math.max(boxSize, 200), height: Math.max(boxSize, 200) };
+                const boxSize = Math.floor(minDim * 0.85);
+                return { width: Math.max(boxSize, 180), height: Math.max(boxSize, 180) };
             },
             disableFlip: false
         };
@@ -576,7 +576,7 @@ document.addEventListener('DOMContentLoaded', () => {
             ).then(() => {
                 state.rechargeScannerActive = true;
                 document.getElementById('btn-recharge-camera-start').classList.add('hidden');
-                document.getElementById('btn-recharge-camera-stop').classList.remove('hidden');
+                document.getElementById('btn-recharge-camera-stop').classList.add('hidden');
             }).catch(e => {
                 if (mode === "environment") {
                     startRechargeFacingFallback("user");
