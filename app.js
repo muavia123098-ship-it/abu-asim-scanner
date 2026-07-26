@@ -1,6 +1,6 @@
 /* ==========================================================================
    Karachi Green Line BRT - Smart QR Ticket & Reusable Card System
-   Official QRCodeStyling Engine for Spec-Compliant Scannable Dot QR Codes
+   High-DPI Water-Bubble Liquid Drop QR Generator (Zero Artifacts / Ultra HD)
    ========================================================================== */
 
 document.addEventListener('DOMContentLoaded', () => {
@@ -370,9 +370,9 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // ----------------------------------------------------------------------
-    // 4. OFFICIAL SPEC-COMPLIANT QRCodeStyling ENGINE (INSTANT SCANNABLE DOT QR)
+    // 4. HIGH-DPI WATER-BUBBLE LIQUID DROP QR GENERATOR ENGINE
     // ----------------------------------------------------------------------
-    function generateQRCode(elementId, textData, size = 125) {
+    function generateQRCode(elementId, textData, size = 130) {
         const container = document.getElementById(elementId);
         if (!container) return;
 
@@ -385,23 +385,23 @@ document.addEventListener('DOMContentLoaded', () => {
 
         if (typeof QRCodeStyling !== 'undefined') {
             const qrCode = new QRCodeStyling({
-                width: size,
-                height: size,
+                width: 400, // Render at 400px High-DPI to completely eliminate thin line subpixel artifacts
+                height: 400,
                 type: "canvas",
                 data: textData,
                 dotsOptions: {
-                    color: "#000000",
-                    type: "dots"
+                    color: "#08152b",
+                    type: "rounded" // Water-Bubble Liquid Drop style (iPhone Glass aesthetics)
                 },
                 backgroundOptions: {
                     color: "#ffffff"
                 },
                 cornersSquareOptions: {
-                    color: "#000000",
+                    color: "#08152b",
                     type: "extra-rounded"
                 },
                 cornersDotOptions: {
-                    color: "#000000",
+                    color: "#08152b",
                     type: "dot"
                 },
                 qrOptions: {
@@ -410,12 +410,20 @@ document.addEventListener('DOMContentLoaded', () => {
             });
 
             qrCode.append(container);
+
+            const canvas = container.querySelector('canvas');
+            if (canvas) {
+                canvas.style.width = '100%';
+                canvas.style.height = '100%';
+                canvas.style.display = 'block';
+                canvas.style.borderRadius = '8px';
+            }
         } else if (typeof QRCode !== 'undefined') {
             new QRCode(container, {
                 text: textData,
                 width: size,
                 height: size,
-                colorDark: "#000000",
+                colorDark: "#08152b",
                 colorLight: "#ffffff",
                 correctLevel: QRCode.CorrectLevel.H
             });
@@ -1039,123 +1047,6 @@ document.addEventListener('DOMContentLoaded', () => {
         setTimeout(() => {
             window.print();
         }, 300);
-    });
-
-    document.getElementById('gate-mode-entry').addEventListener('click', () => {
-        state.gateMode = 'ENTRY';
-        document.getElementById('gate-mode-entry').classList.add('active');
-        document.getElementById('gate-mode-exit').classList.remove('active');
-    });
-
-    document.getElementById('gate-mode-exit').addEventListener('click', () => {
-        state.gateMode = 'EXIT';
-        document.getElementById('gate-mode-exit').classList.add('active');
-        document.getElementById('gate-mode-entry').classList.remove('active');
-    });
-
-    document.getElementById('btn-manual-scan').addEventListener('click', () => {
-        const inputVal = document.getElementById('manual-qr-input').value;
-        if (inputVal) {
-            processGuardScan(inputVal);
-            document.getElementById('manual-qr-input').value = '';
-        }
-    });
-
-    document.getElementById('btn-start-camera').addEventListener('click', startGuardCameraScanner);
-    document.getElementById('btn-stop-camera').addEventListener('click', stopGuardCameraScanner);
-
-    document.getElementById('btn-recharge-camera-start').addEventListener('click', startRechargeCameraScanner);
-    document.getElementById('btn-recharge-camera-stop').addEventListener('click', stopRechargeCameraScanner);
-
-    const btnGuardMode = document.getElementById('btn-guard-mode');
-    const btnAdminMode = document.getElementById('btn-admin-mode');
-    const guardView = document.getElementById('guard-view');
-    const adminView = document.getElementById('admin-view');
-    const pinModal = document.getElementById('pin-modal');
-    const pinInput = document.getElementById('pin-input');
-
-    btnGuardMode.addEventListener('click', () => {
-        state.activeView = 'GUARD';
-        btnGuardMode.classList.add('active');
-        btnAdminMode.classList.remove('active');
-        guardView.classList.remove('hidden');
-        adminView.classList.add('hidden');
-        stopRechargeCameraScanner();
-    });
-
-    btnAdminMode.addEventListener('click', () => {
-        pinModal.classList.remove('hidden');
-        pinInput.value = '';
-        pinInput.focus();
-    });
-
-    document.getElementById('btn-cancel-pin').addEventListener('click', () => {
-        pinModal.classList.add('hidden');
-    });
-
-    document.getElementById('btn-verify-pin').addEventListener('click', verifyAdminPin);
-    pinInput.addEventListener('keypress', (e) => {
-        if (e.key === 'Enter') verifyAdminPin();
-    });
-
-    function verifyAdminPin() {
-        if (pinInput.value === state.adminPin) {
-            pinModal.classList.add('hidden');
-            state.activeView = 'ADMIN';
-            btnAdminMode.classList.add('active');
-            btnGuardMode.classList.remove('active');
-            adminView.classList.remove('hidden');
-            guardView.classList.add('hidden');
-            stopGuardCameraScanner();
-        } else {
-            alert('❌ Galat Security PIN Code!');
-            pinInput.value = '';
-            pinInput.focus();
-        }
-    }
-
-    // Fail-Safe Guaranteed Unique Card ID Generator
-    document.getElementById('form-create-card').addEventListener('submit', (e) => {
-        e.preventDefault();
-
-        const name = document.getElementById('card-user-name').value.trim();
-        const phone = document.getElementById('card-user-phone').value.trim();
-        const cnic = document.getElementById('card-user-cnic').value.trim();
-        const initialBal = parseFloat(document.getElementById('card-initial-balance').value);
-
-        let maxNum = 1000;
-        state.cards.forEach(c => {
-            if (c && c.id) {
-                const match = c.id.match(/\d+/);
-                if (match) {
-                    const num = parseInt(match[0]);
-                    if (num > maxNum) maxNum = num;
-                }
-            }
-        });
-
-        const newId = `GL-CARD-${maxNum + 1}`;
-
-        const newCard = {
-            id: newId,
-            name: name,
-            phone: phone,
-            cnic: cnic || 'N/A',
-            balance: initialBal,
-            initialBalance: initialBal,
-            status: 'COMPLETED',
-            createdAt: new Date().toLocaleDateString()
-        };
-
-        state.cards.push(newCard);
-        syncCardToCloud(newCard);
-        state.activeCardId = newId;
-
-        renderApp();
-        displayCardPreview(newId);
-        playGrantedSound();
-        alert(`✅ CARD ISSUED & SYNCED TO ALL DEVICES!\nCard ID: ${newId}\nBalance: Rs. ${initialBal}`);
-        document.getElementById('form-create-card').reset();
     });
 
     initStore();
