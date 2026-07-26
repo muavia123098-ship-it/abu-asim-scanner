@@ -1,6 +1,6 @@
 /* ==========================================================================
    Karachi Green Line BRT - Smart QR Ticket & Reusable Card System
-   HD 60 FPS Camera Scanner & Full-Frame Instant Recognition Tuning
+   100% Multi-Device Fail-Safe Camera Engine (Laptop, Mobile & Tablet Supported)
    ========================================================================== */
 
 document.addEventListener('DOMContentLoaded', () => {
@@ -355,7 +355,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         } else {
             if (card.status !== 'IN_TRANSIT') {
-                triggerSignalResult(false, 'NO ENTRY RECORD', `${card.name} Ka Entry Record Mila!`);
+                triggerSignalResult(false, 'NO ENTRY RECORD', `${card.name} Ka Entry Record Nahi Mila!`);
                 addScanHistoryLog(card.id, card.name, 'DENIED - NO ENTRY LOG', 0);
                 return;
             }
@@ -434,11 +434,10 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // ----------------------------------------------------------------------
-    // 6. HIGH-RESOLUTION HD 60 FPS ULTRA FAST QR SCANNER ENGINE
+    // 6. 100% FAIL-SAFE CAMERA ENGINE FOR LAPTOP, PC, MOBILE & TABLET
     // ----------------------------------------------------------------------
     function startGuardCameraScanner() {
         if (typeof Html5Qrcode === 'undefined') return;
-
         if (state.scannerActive) return;
 
         if (!html5QrCodeGuard) {
@@ -450,62 +449,60 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         const cameraConfig = {
-            fps: 60,
-            qrbox: (viewfinderWidth, viewfinderHeight) => {
-                return {
-                    width: Math.floor(viewfinderWidth * 0.95),
-                    height: Math.floor(viewfinderHeight * 0.95)
-                };
-            },
+            fps: 30,
+            qrbox: (w, h) => ({ width: Math.floor(w * 0.95), height: Math.floor(h * 0.95) }),
             disableFlip: false
         };
 
-        const cameraConstraints = {
-            facingMode: "environment",
-            width: { ideal: 1920 },
-            height: { ideal: 1080 }
-        };
+        // Query available camera devices for 100% compatibility across Laptops & Mobiles
+        Html5Qrcode.getCameras().then(devices => {
+            if (devices && devices.length > 0) {
+                // Find rear/back camera on mobile; default to first/last camera on desktop
+                let backCam = devices.find(d => 
+                    d.label.toLowerCase().includes('back') || 
+                    d.label.toLowerCase().includes('rear') || 
+                    d.label.toLowerCase().includes('environment')
+                ) || devices[devices.length - 1];
 
-        html5QrCodeGuard.start(
-            cameraConstraints,
-            cameraConfig,
-            (decodedText) => processGuardScan(decodedText),
-            (err) => {}
-        ).then(() => {
-            state.scannerActive = true;
-            document.getElementById('btn-start-camera').classList.add('hidden');
-            document.getElementById('btn-stop-camera').classList.remove('hidden');
+                const targetId = backCam.id;
 
-            try {
-                const videoEl = document.querySelector("#reader video");
-                if (videoEl && videoEl.srcObject) {
-                    const track = videoEl.srcObject.getVideoTracks()[0];
-                    if (track && track.getCapabilities) {
-                        const caps = track.getCapabilities();
-                        if (caps.focusMode && caps.focusMode.includes('continuous')) {
-                            track.applyConstraints({ advanced: [{ focusMode: 'continuous' }] }).catch(e => {});
-                        }
-                    }
-                }
-            } catch(e) {}
-
+                html5QrCodeGuard.start(
+                    targetId,
+                    cameraConfig,
+                    (decodedText) => processGuardScan(decodedText),
+                    (err) => {}
+                ).then(() => {
+                    state.scannerActive = true;
+                    document.getElementById('btn-start-camera').classList.add('hidden');
+                    document.getElementById('btn-stop-camera').classList.remove('hidden');
+                }).catch(err => {
+                    startCameraFacingFallback("environment");
+                });
+            } else {
+                startCameraFacingFallback("environment");
+            }
         }).catch(err => {
-            console.warn("HD camera start error, trying default environment mode:", err);
-            
+            startCameraFacingFallback("environment");
+        });
+
+        function startCameraFacingFallback(mode) {
             html5QrCodeGuard.start(
-                { facingMode: "environment" },
-                { fps: 40, disableFlip: false },
+                { facingMode: mode },
+                cameraConfig,
                 (decodedText) => processGuardScan(decodedText),
                 (err) => {}
             ).then(() => {
                 state.scannerActive = true;
                 document.getElementById('btn-start-camera').classList.add('hidden');
                 document.getElementById('btn-stop-camera').classList.remove('hidden');
-            }).catch(fallbackErr => {
-                console.error("All camera start attempts failed:", fallbackErr);
-                alert("🎥 Camera Open Alert:\n\nChrome Browser mein Lock 🔒 icon dabayein -> Camera Permission ko ALLOW karke page reload karein!");
+            }).catch(err => {
+                if (mode === "environment") {
+                    startCameraFacingFallback("user");
+                } else {
+                    alert("🎥 Camera Open Alert:\nBrowser me Camera permission allow karein aur page reload karein.");
+                }
             });
-        });
+        }
     }
 
     function stopGuardCameraScanner() {
@@ -520,7 +517,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function startRechargeCameraScanner() {
         if (typeof Html5Qrcode === 'undefined') return;
-
         if (state.rechargeScannerActive) return;
 
         if (!html5QrCodeRecharge) {
@@ -532,33 +528,41 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         const cameraConfig = {
-            fps: 60,
+            fps: 30,
             qrbox: (w, h) => ({ width: Math.floor(w * 0.95), height: Math.floor(h * 0.95) }),
             disableFlip: false
         };
 
-        const cameraConstraints = {
-            facingMode: "environment",
-            width: { ideal: 1920 },
-            height: { ideal: 1080 }
-        };
+        Html5Qrcode.getCameras().then(devices => {
+            if (devices && devices.length > 0) {
+                let backCam = devices.find(d => 
+                    d.label.toLowerCase().includes('back') || 
+                    d.label.toLowerCase().includes('rear') || 
+                    d.label.toLowerCase().includes('environment')
+                ) || devices[devices.length - 1];
 
-        html5QrCodeRecharge.start(
-            cameraConstraints,
-            cameraConfig,
-            (decodedText) => {
-                fetchCardForRecharge(decodedText);
-                playGrantedSound();
-            },
-            (err) => {}
-        ).then(() => {
-            state.rechargeScannerActive = true;
-            document.getElementById('btn-recharge-camera-start').classList.add('hidden');
-            document.getElementById('btn-recharge-camera-stop').classList.remove('hidden');
-        }).catch(err => {
+                html5QrCodeRecharge.start(
+                    backCam.id,
+                    cameraConfig,
+                    (decodedText) => {
+                        fetchCardForRecharge(decodedText);
+                        playGrantedSound();
+                    },
+                    (err) => {}
+                ).then(() => {
+                    state.rechargeScannerActive = true;
+                    document.getElementById('btn-recharge-camera-start').classList.add('hidden');
+                    document.getElementById('btn-recharge-camera-stop').classList.remove('hidden');
+                }).catch(err => startRechargeFacingFallback("environment"));
+            } else {
+                startRechargeFacingFallback("environment");
+            }
+        }).catch(err => startRechargeFacingFallback("environment"));
+
+        function startRechargeFacingFallback(mode) {
             html5QrCodeRecharge.start(
-                { facingMode: "environment" },
-                { fps: 40, disableFlip: false },
+                { facingMode: mode },
+                cameraConfig,
                 (decodedText) => {
                     fetchCardForRecharge(decodedText);
                     playGrantedSound();
@@ -568,8 +572,14 @@ document.addEventListener('DOMContentLoaded', () => {
                 state.rechargeScannerActive = true;
                 document.getElementById('btn-recharge-camera-start').classList.add('hidden');
                 document.getElementById('btn-recharge-camera-stop').classList.remove('hidden');
-            }).catch(e => alert("🎥 Browser settings se Camera ALLOW karein."));
-        });
+            }).catch(e => {
+                if (mode === "environment") {
+                    startRechargeFacingFallback("user");
+                } else {
+                    alert("🎥 Browser settings se Camera ALLOW karein.");
+                }
+            });
+        }
     }
 
     function stopRechargeCameraScanner() {
