@@ -1,6 +1,6 @@
 /* ==========================================================================
    Karachi Green Line BRT - Smart QR Ticket & Reusable Card System
-   Original White Square Box Area Restored for Mobile & Laptop
+   100% Perfect Camera Feed Alignment & Zero Aspect Ratio Distortion
    ========================================================================== */
 
 :root {
@@ -267,11 +267,13 @@ html, body {
     gap: 14px;
 }
 
+/* Dynamic Aspect Ratio Wrapper for Perfect Camera Alignment */
 .scanner-frame-wrapper {
     position: relative;
     width: 100%;
     max-width: 550px;
-    height: 340px;
+    min-height: 260px;
+    height: auto;
     background: #000;
     border-radius: var(--radius-md);
     overflow: hidden;
@@ -282,13 +284,8 @@ html, body {
     box-shadow: 0 0 20px var(--primary-green-glow);
 }
 
-.scanner-frame-wrapper.small-frame {
-    height: 250px;
-}
-
 #reader, #recharge-reader {
     width: 100% !important;
-    height: 100% !important;
     border: none !important;
 }
 
@@ -299,12 +296,13 @@ html, body {
     display: none !important;
 }
 
-/* Sharp Video Feed */
+/* Perfect Uncropped Camera Video Rendering */
 #reader video, #recharge-reader video {
     width: 100% !important;
-    height: 100% !important;
-    object-fit: cover !important;
-    filter: contrast(106%) brightness(103%) !important;
+    height: auto !important;
+    max-height: 65vh !important;
+    object-fit: contain !important;
+    display: block !important;
 }
 
 .scan-laser {

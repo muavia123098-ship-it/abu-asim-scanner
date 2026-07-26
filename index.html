@@ -1,280 +1,270 @@
 <!DOCTYPE html>
-<html lang="ur">
+<html lang="ur" dir="ltr">
 <head>
     <meta charset="UTF-8">
-    <!-- Viewport configured with maximum-scale=1.0 to prevent mobile auto-zoom on input focus -->
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Karachi Green Line BRT - Firebase PWA Smart System</title>
-    <!-- PWA Manifest & Theme Color -->
+    <title>Karachi Green Line BRT - Smart Ticket & Reusable Pass System</title>
+    
+    <!-- PWA & Mobile Web App Capabilities -->
     <link rel="manifest" href="manifest.json">
-    <meta name="theme-color" content="#00e676">
+    <meta name="theme-color" content="#090e17">
+    <meta name="mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="apple-mobile-web-app-title" content="GreenLine BRT">
 
-    <!-- Google Fonts -->
+    <!-- Google Fonts & FontAwesome -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
-    <!-- FontAwesome Icons -->
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <!-- Style CSS -->
+    
+    <!-- Custom CSS -->
     <link rel="stylesheet" href="style.css">
-    <!-- QRCode JS Library -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
-    <!-- HTML5 QR Code Scanner Library -->
-    <script src="https://unpkg.com/html5-qrcode" type="text/javascript"></script>
 
-    <!-- FIREBASE COMPAT SDKs -->
-    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
+    <!-- QRCode Generator & Html5Qrcode Reader Libraries -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html5-qrcode/2.3.8/html5-qrcode.min.js"></script>
+
+    <!-- Firebase SDK (v8 Compat for Direct Production Cloud Sync) -->
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
 </head>
 <body>
-    <!-- Printable Area -->
-    <div id="printable-card-area" class="printable-area"></div>
 
-    <!-- App Container -->
-    <div id="app" class="app-container">
+    <div class="app-container">
         
-        <!-- Top Header Navigation Bar -->
+        <!-- HEADER / BRANDING -->
         <header class="app-header">
             <div class="brand">
                 <div class="logo-icon">
                     <i class="fa-solid fa-bus-simple"></i>
                 </div>
                 <div class="brand-text">
-                    <h1>GREEN LINE BRT</h1>
-                    <span class="sub-text" id="cloud-status-tag"><i class="fa-solid fa-cloud"></i> FIREBASE REAL-TIME CLOUD</span>
+                    <h1>KARACHI GREEN LINE BRT</h1>
+                    <span class="sub-text">SMART TICKET & PVC REUSABLE CARD SYSTEM</span>
                 </div>
             </div>
-            
-            <div class="header-right-actions" id="header-right-actions">
-                <!-- PWA Install button will ONLY be injected dynamically by JS if NOT in installed standalone app mode -->
 
+            <div class="header-right-actions" id="header-right-actions">
                 <div class="mode-switch-container">
-                    <button id="btn-guard-mode" class="mode-btn active">
+                    <button class="mode-btn active" id="btn-guard-mode">
                         <i class="fa-solid fa-qrcode"></i> Guard Scanner Tool
                     </button>
-                    <button id="btn-admin-mode" class="mode-btn">
-                        <i class="fa-solid fa-lock"></i> Admin Panel
+                    <button class="mode-btn" id="btn-admin-mode">
+                        <i class="fa-solid fa-user-shield"></i> Admin Panel
                     </button>
                 </div>
             </div>
         </header>
 
-        <!-- Signal Overlay for Full Screen Scan Feedback (Green / Red) -->
-        <div id="signal-overlay" class="signal-overlay hidden">
-            <div class="signal-content">
-                <div id="signal-icon" class="signal-icon"></div>
-                <h2 id="signal-title">ACCESS GRANTED</h2>
-                <p id="signal-msg">Balance Deducted: Rs. 25</p>
-                <div id="signal-card-info" class="signal-card-info"></div>
-            </div>
-        </div>
-
-        <!-- MAIN VIEW 1: GUARD SCANNER TOOL (DEFAULT GUARD VIEW) -->
-        <main id="guard-view" class="view-section active">
+        <!-- MAIN VIEW 1: GUARD SCANNER TOOL (DEFAULT ACTIVE) -->
+        <main id="guard-view" class="view-section">
             <div class="scanner-hero">
+                
                 <div class="scanner-header-info">
-                    <span class="badge badge-live"><i class="fa-solid fa-cloud-arrow-down"></i> LIVE CLOUD SCANNER ACTIVE</span>
-                    <span class="station-name"><i class="fa-solid fa-location-dot"></i> Surjani Town Terminal</span>
+                    <div class="badge-live">
+                        <i class="fa-solid fa-circle"></i> LIVE CLOUD SCANNER ACTIVE
+                    </div>
+                    <div class="station-name">
+                        <i class="fa-solid fa-location-dot"></i> Surjani Town Terminal
+                    </div>
                 </div>
 
-                <!-- Scanner Mode Selector: Entry vs Exit -->
+                <!-- Gate Mode Switcher -->
                 <div class="gate-mode-selector">
-                    <button id="gate-mode-entry" class="gate-tab active">
-                        <i class="fa-solid fa-right-to-bracket"></i> ENTRY GATE (داخلی گیٹ)
+                    <button class="gate-tab active" id="gate-mode-entry">
+                        <i class="fa-solid fa-right-to-bracket"></i>
+                        ENTRY GATE (داخلی گیٹ)
                         <span class="fare-tag">Deducts Rs. 25</span>
                     </button>
-                    <button id="gate-mode-exit" class="gate-tab">
-                        <i class="fa-solid fa-right-from-bracket"></i> EXIT GATE (خارجی گیٹ)
+                    <button class="gate-tab" id="gate-mode-exit">
+                        <i class="fa-solid fa-right-from-bracket"></i>
+                        EXIT GATE (خارجی گیٹ)
                         <span class="fare-tag">Deducts Rs. 25</span>
                     </button>
                 </div>
 
-                <!-- Live Mobile Camera Frame -->
+                <!-- Camera Container Card -->
                 <div class="camera-card">
-                    <div class="scanner-frame-wrapper">
+                    <div class="scanner-frame-wrapper" id="guard-scanner-wrapper">
                         <div id="reader"></div>
                         <div class="scan-laser"></div>
-                        <div class="scanner-corners">
-                            <span></span><span></span><span></span><span></span>
-                        </div>
                     </div>
+
                     <div class="camera-controls">
-                        <button id="btn-start-camera" class="btn btn-emerald btn-block">
+                        <button class="btn btn-emerald btn-block" id="btn-start-camera">
                             <i class="fa-solid fa-camera"></i> Guard Mobile Camera Scanner Open Karein
                         </button>
-                        <button id="btn-stop-camera" class="btn btn-outline btn-block hidden">
-                            <i class="fa-solid fa-video-slash"></i> Camera Stop Karein
+                        <button class="btn btn-outline btn-block hidden" id="btn-stop-camera">
+                            <i class="fa-solid fa-camera-rotate"></i> Camera Stop Karein
                         </button>
                     </div>
                 </div>
 
-                <!-- Manual Card ID Search -->
+                <!-- Manual Test Search Box -->
                 <div class="manual-input-box">
-                    <label for="manual-qr-input"><i class="fa-solid fa-keyboard"></i> Manual Search:</label>
+                    <label for="manual-qr-input">Manual Card Search / Barcode Gun Scan:</label>
                     <div class="manual-input-row">
                         <input type="text" id="manual-qr-input" placeholder="e.g. GL-CARD-1001">
-                        <button id="btn-manual-scan" class="btn btn-primary">
-                            <i class="fa-solid fa-bolt"></i> Scan Card ID
-                        </button>
+                        <button class="btn btn-emerald" id="btn-manual-scan">Scan</button>
                     </div>
                 </div>
 
-                <!-- Live Gate History Log -->
+                <!-- Live Log Feed -->
                 <div class="scan-history-box">
-                    <h3><i class="fa-solid fa-clock-rotate-left"></i> Live Gate Log (Cloud Synced)</h3>
+                    <h3><i class="fa-solid fa-clock-rotate-left"></i> Live Passenger Entry/Exit Logs</h3>
                     <div class="history-list" id="scan-history-list">
-                        <div class="empty-state">Abhi tak koi scan record nahi hua.</div>
+                        <div class="empty-state">No scans recorded in this session.</div>
                     </div>
                 </div>
+
             </div>
         </main>
 
-        <!-- MAIN VIEW 2: ADMIN PANEL WITH SIDEBAR NAVIGATION (PIN PROTECTED) -->
+        <!-- MAIN VIEW 2: ADMIN PANEL (PIN PROTECTED) -->
         <main id="admin-view" class="view-section hidden">
+            
             <div class="admin-layout">
                 
                 <!-- Admin Sidebar Navigation -->
                 <aside class="admin-sidebar">
                     <div class="sidebar-header">
-                        <i class="fa-solid fa-user-shield"></i> ADMIN MENU
+                        <i class="fa-solid fa-sliders"></i> ADMIN MENU
                     </div>
                     <nav class="sidebar-menu">
-                        <button id="nav-dash" class="nav-item active">
+                        <button class="nav-item active" id="nav-dash">
                             <i class="fa-solid fa-chart-pie"></i> Dashboard Overview
                         </button>
-                        <button id="nav-issue" class="nav-item">
-                            <i class="fa-solid fa-address-card"></i> Issue New Card
+                        <button class="nav-item" id="nav-issue">
+                            <i class="fa-solid fa-id-card"></i> Issue New Smart Pass
                         </button>
-                        <button id="nav-recharge" class="nav-item">
-                            <i class="fa-solid fa-bolt-lightning"></i> QR Recharge Tool
+                        <button class="nav-item" id="nav-recharge">
+                            <i class="fa-solid fa-wallet"></i> Recharge Balance Tool
                         </button>
-                        <button id="nav-gallery" class="nav-item">
-                            <i class="fa-solid fa-qrcode"></i> QR Cards Gallery
+                        <button class="nav-item" id="nav-gallery">
+                            <i class="fa-solid fa-qrcode"></i> All Issued QR Codes
                         </button>
-                        <button id="nav-settings" class="nav-item">
-                            <i class="fa-solid fa-key"></i> Change PIN Code
+                        <button class="nav-item" id="nav-settings">
+                            <i class="fa-solid fa-gear"></i> System Settings
                         </button>
                     </nav>
                 </aside>
 
-                <!-- Admin Main Content Body -->
+                <!-- Admin Main Content Area -->
                 <section class="admin-content">
                     
                     <!-- TAB 1: DASHBOARD OVERVIEW -->
-                    <div id="tab-dash-content" class="tab-page active">
+                    <div id="tab-dash-content" class="tab-page">
                         <div class="stats-grid">
                             <div class="stat-card">
-                                <div class="stat-icon icon-cards"><i class="fa-solid fa-id-card"></i></div>
+                                <div class="stat-icon icon-cards">
+                                    <i class="fa-solid fa-credit-card"></i>
+                                </div>
                                 <div class="stat-data">
-                                    <span class="stat-label">Total Cloud Issued Cards</span>
+                                    <span class="stat-label">Total Issued Cards</span>
                                     <h3 id="stat-total-cards">0</h3>
                                 </div>
                             </div>
+
                             <div class="stat-card">
-                                <div class="stat-icon icon-revenue"><i class="fa-solid fa-wallet"></i></div>
+                                <div class="stat-icon icon-revenue">
+                                    <i class="fa-solid fa-money-bill-wave"></i>
+                                </div>
                                 <div class="stat-data">
-                                    <span class="stat-label">Total Cloud Revenue</span>
+                                    <span class="stat-label">Total Cloud Balance</span>
                                     <h3 id="stat-total-revenue">Rs. 0</h3>
                                 </div>
                             </div>
+
                             <div class="stat-card">
-                                <div class="stat-icon icon-transit"><i class="fa-solid fa-bus"></i></div>
+                                <div class="stat-icon icon-transit">
+                                    <i class="fa-solid fa-bus"></i>
+                                </div>
                                 <div class="stat-data">
-                                    <span class="stat-label">In Transit Passengers</span>
+                                    <span class="stat-label">Passengers In Transit</span>
                                     <h3 id="stat-in-transit">0</h3>
                                 </div>
                             </div>
                         </div>
 
-                        <!-- Issued Cards Master Table -->
+                        <!-- System Registered Cards Table -->
                         <div class="cards-table-container margin-top-20">
-                            <h2><i class="fa-solid fa-list-check"></i> Firebase Real-Time Cards Database</h2>
+                            <div class="section-title-row">
+                                <h3><i class="fa-solid fa-database"></i> Registered Passenger Passes</h3>
+                            </div>
                             <div class="table-responsive">
                                 <table class="data-table">
                                     <thead>
                                         <tr>
                                             <th>Card ID</th>
                                             <th>Passenger Name</th>
-                                            <th>Mobile Number</th>
+                                            <th>Phone Number</th>
                                             <th>Balance</th>
                                             <th>Status</th>
-                                            <th>Actions</th>
+                                            <th>Action</th>
                                         </tr>
                                     </thead>
                                     <tbody id="cards-table-body">
-                                        <!-- Dynamic cards from Firebase -->
+                                        <!-- Dynamic JS Rows -->
                                     </tbody>
                                 </table>
                             </div>
                         </div>
                     </div>
 
-                    <!-- TAB 2: ISSUE NEW SMART CARD -->
+                    <!-- TAB 2: ISSUE NEW SMART PASS -->
                     <div id="tab-issue-content" class="tab-page hidden">
                         <div class="issue-page-grid">
                             
+                            <!-- Issue Form -->
                             <div class="card-form-box">
-                                <h2><i class="fa-solid fa-plus-circle"></i> Naya Smart QR Card Issue Karein</h2>
+                                <h2><i class="fa-solid fa-user-plus"></i> Naya Reusable Smart Pass Banayein</h2>
                                 <form id="form-create-card">
                                     <div class="form-group">
-                                        <label for="card-user-name">Passenger Ka Naam:</label>
-                                        <input type="text" id="card-user-name" placeholder="e.g. Ali Ahmed" required>
+                                        <label for="card-user-name">Passenger Name *</label>
+                                        <input type="text" id="card-user-name" placeholder="e.g. Muhammad Ali" required>
                                     </div>
-
                                     <div class="form-group">
-                                        <label for="card-user-phone">Mobile Number:</label>
-                                        <input type="tel" id="card-user-phone" placeholder="e.g. 0300-1234567" required>
+                                        <label for="card-user-phone">Mobile Phone Number *</label>
+                                        <input type="tel" id="card-user-phone" placeholder="e.g. 03001234567" required>
                                     </div>
-
                                     <div class="form-group">
-                                        <label for="card-user-cnic">CNIC / Student ID:</label>
-                                        <input type="text" id="card-user-cnic" placeholder="e.g. 42101-XXXXXXX-X">
+                                        <label for="card-user-cnic">CNIC / B-Form Number (Optional)</label>
+                                        <input type="text" id="card-user-cnic" placeholder="e.g. 42101-1234567-1">
                                     </div>
-
                                     <div class="form-group">
-                                        <label for="card-initial-balance">Initial Recharge Amount (Rs.):</label>
-                                        <select id="card-initial-balance" class="select-input">
-                                            <option value="50">Rs. 50 (Standard Fare)</option>
-                                            <option value="100" selected>Rs. 100 (Recommended)</option>
-                                            <option value="200">Rs. 200 (Weekly Pass)</option>
-                                            <option value="500">Rs. 500 (Monthly Pass)</option>
+                                        <label for="card-initial-balance">Initial Recharge Amount (Rs.) *</label>
+                                        <select id="card-initial-balance" class="select-input" required>
+                                            <option value="100">Rs. 100 (Min Balance)</option>
+                                            <option value="250" selected>Rs. 250 (Recommended)</option>
+                                            <option value="500">Rs. 500</option>
+                                            <option value="1000">Rs. 1000</option>
                                         </select>
                                     </div>
-
-                                    <button type="submit" class="btn btn-emerald btn-block">
-                                        <i class="fa-solid fa-cloud-arrow-up"></i> Smart Card Firebase Par Banayein
+                                    <button type="submit" class="btn btn-emerald btn-block margin-top-20">
+                                        <i class="fa-solid fa-print"></i> Issue & Generate Smart Pass
                                     </button>
                                 </form>
                             </div>
 
-                            <!-- Generated Card Preview -->
+                            <!-- Live PVC Card Preview & Print Target -->
                             <div class="card-preview-section">
-                                <div class="section-title-row">
-                                    <h2><i class="fa-solid fa-address-card"></i> Smart PVC Card Preview</h2>
-                                    <button id="btn-print-card" class="btn btn-primary">
-                                        <i class="fa-solid fa-print"></i> Print Card
-                                    </button>
-                                </div>
-
-                                <div id="smart-card-display" class="smart-pvc-card">
+                                <h3>Official Smart PVC Pass Preview</h3>
+                                
+                                <div class="smart-pvc-card" id="preview-card-container">
                                     <div class="card-top-bg">
                                         <div class="card-brand">
-                                            <i class="fa-solid fa-bus-simple"></i> KARACHI GREEN LINE BRT
+                                            <i class="fa-solid fa-bus-simple"></i> KARACHI GREEN LINE
                                         </div>
-                                        <span class="card-type-tag">REUSABLE PASS</span>
+                                        <span class="card-type-tag">OFFICIAL PASS</span>
                                     </div>
                                     <div class="card-body-content">
                                         <div class="card-info">
-                                            <h3 id="preview-user-name">No Card Selected</h3>
-                                            <p class="card-id-text">ID: <span id="preview-card-id">GL-CARD-XXXX</span></p>
-                                            <p class="card-phone-text"><i class="fa-solid fa-phone"></i> <span id="preview-card-phone">03XX-XXXXXXX</span></p>
-                                            <div class="card-balance-badge">
-                                                BALANCE: <span id="preview-card-balance">Rs. 0</span>
-                                            </div>
-                                            <span id="preview-card-status" class="status-badge status-active">ACTIVE</span>
+                                            <h3 id="preview-user-name">Passenger Name</h3>
+                                            <span class="card-id-text">Card ID: <b id="preview-card-id">GL-CARD-1001</b></span>
+                                            <span class="card-phone-text">Phone: <span id="preview-card-phone">0300-XXXXXXX</span></span>
+                                            <div class="card-balance-badge" id="preview-card-balance">Rs. 250</div>
                                         </div>
                                         <div class="card-qr-box">
                                             <div id="preview-qr-code"></div>
@@ -282,73 +272,76 @@
                                         </div>
                                     </div>
                                 </div>
+
+                                <div class="card-actions-row">
+                                    <span id="preview-card-status" class="status-badge status-active">ACTIVE ✅</span>
+                                    <button class="btn btn-gold" id="btn-print-card">
+                                        <i class="fa-solid fa-print"></i> Print Smart Card
+                                    </button>
+                                </div>
                             </div>
 
                         </div>
                     </div>
 
-                    <!-- TAB 3: DEDICATED QR CAMERA RECHARGE TOOL -->
+                    <!-- TAB 3: RECHARGE BALANCE TOOL -->
                     <div id="tab-recharge-content" class="tab-page hidden">
                         <div class="recharge-tool-box">
-                            <h2><i class="fa-solid fa-bolt-lightning"></i> Cloud QR Recharge Station</h2>
-                            <p class="recharge-desc">Card ko Camera se Scan Karein ya neeche Select/Type karke 1-Click Recharge Karein:</p>
+                            <h2><i class="fa-solid fa-bolt"></i> Fast Balance Recharge Terminal</h2>
+                            <p class="recharge-desc">Card QR Code scan karein ya Card ID select karke instant balance top-up karein.</p>
 
-                            <!-- Camera Scanner for Admin Recharge -->
+                            <!-- Recharge Camera Container -->
                             <div class="recharge-camera-card">
                                 <div class="scanner-frame-wrapper small-frame">
                                     <div id="recharge-reader"></div>
-                                    <div class="scan-laser"></div>
                                 </div>
                                 <div class="camera-controls">
-                                    <button id="btn-recharge-camera-start" class="btn btn-emerald btn-block">
-                                        <i class="fa-solid fa-camera"></i> Recharge Camera Scanner Open Karein
+                                    <button class="btn btn-gold btn-block" id="btn-recharge-camera-start">
+                                        <i class="fa-solid fa-camera"></i> Open Camera for Recharge Scan
                                     </button>
-                                    <button id="btn-recharge-camera-stop" class="btn btn-outline btn-block hidden">
-                                        <i class="fa-solid fa-video-slash"></i> Camera Stop Karein
+                                    <button class="btn btn-outline btn-block hidden" id="btn-recharge-camera-stop">
+                                        <i class="fa-solid fa-circle-stop"></i> Stop Recharge Camera
                                     </button>
                                 </div>
                             </div>
 
-                            <!-- Search / Select Card Input -->
+                            <!-- Manual Recharge Select & Search -->
                             <div class="recharge-select-row">
                                 <div class="form-group flex-1">
-                                    <label for="recharge-select-card">Card Select Karein:</label>
+                                    <label for="recharge-select-card">Select Passenger Card from List:</label>
                                     <select id="recharge-select-card" class="select-input">
                                         <option value="">-- Card Select Karein --</option>
                                     </select>
                                 </div>
                                 <div class="form-group flex-1">
-                                    <label for="recharge-search-id">Ya Card ID Manual Enter Karein:</label>
+                                    <label for="recharge-search-id">Or Enter Card ID Manually:</label>
                                     <div class="input-with-btn">
                                         <input type="text" id="recharge-search-id" placeholder="e.g. GL-CARD-1001">
-                                        <button id="btn-recharge-search-id" class="btn btn-primary">
-                                            <i class="fa-solid fa-search"></i> Fetch Details
-                                        </button>
+                                        <button class="btn btn-primary" id="btn-recharge-search-id">Fetch Card</button>
                                     </div>
                                 </div>
                             </div>
 
-                            <!-- Fetched Card Details & Recharge Form -->
+                            <!-- Target Card Recharge Form Box -->
                             <div id="recharge-card-result" class="recharge-card-result hidden">
                                 <div class="result-card-header">
                                     <div class="passenger-details">
-                                        <h3 id="rc-name">Ali Ahmed</h3>
-                                        <p>Card ID: <strong id="rc-id">GL-CARD-1001</strong> | Phone: <span id="rc-phone">0300-1234567</span></p>
+                                        <h3 id="rc-name">Name</h3>
+                                        <p>ID: <strong id="rc-id">ID</strong> | Phone: <span id="rc-phone">Phone</span></p>
                                     </div>
                                     <div class="current-bal-box">
-                                        CURRENT BALANCE
-                                        <h2 id="rc-balance">Rs. 100</h2>
+                                        <span>Current Balance</span>
+                                        <h2 id="rc-balance">Rs. 0</h2>
                                     </div>
                                 </div>
 
                                 <div class="recharge-action-form">
                                     <div class="form-group">
-                                        <label for="recharge-amount-input">Kitna Balance Recharge Karna Hai? (Rs.):</label>
-                                        <input type="number" id="recharge-amount-input" placeholder="e.g. 50, 100, 200, 500" min="10" value="50">
+                                        <label for="recharge-amount-input">Recharge Amount (Rs.) *</label>
+                                        <input type="number" id="recharge-amount-input" placeholder="e.g. 200" min="50" step="50" value="200">
                                     </div>
-
-                                    <button id="btn-confirm-recharge" class="btn btn-gold btn-block btn-lg">
-                                        <i class="fa-solid fa-cloud-arrow-up"></i> CONFIRM RECHARGE TO CLOUD ⚡
+                                    <button class="btn btn-emerald btn-lg" id="btn-confirm-recharge">
+                                        <i class="fa-solid fa-circle-check"></i> Add Balance & Sync to Cloud
                                     </button>
                                 </div>
                             </div>
@@ -356,83 +349,87 @@
                         </div>
                     </div>
 
-                    <!-- TAB 4: ALL ISSUED CARDS QR GALLERY -->
+                    <!-- TAB 4: ALL ISSUED QR CODES GALLERY -->
                     <div id="tab-gallery-content" class="tab-page hidden">
                         <div class="qr-gallery-section">
-                            <h2><i class="fa-solid fa-qrcode"></i> All Issued Cards QR Gallery</h2>
-                            <p class="gallery-desc">Iss page ko open rakhein aur Guard scanner mobile se har card ka QR Code live scan karke test karein:</p>
-                            <div id="qr-gallery-grid" class="qr-gallery-grid">
-                                <!-- Populated dynamically -->
+                            2<h2><i class="fa-solid fa-qrcode"></i> All Passenger QR Code Gallery</h2>
+                            <p class="gallery-desc">Tamaam issued cards ke QR Codes direct scan & testing ke liye yahan available hain.</p>
+                            <div class="qr-gallery-grid" id="qr-gallery-grid">
+                                <!-- Dynamic JS Cards Gallery -->
                             </div>
                         </div>
                     </div>
 
-                    <!-- TAB 5: CHANGE ADMIN SECURITY PIN -->
+                    <!-- TAB 5: SYSTEM SETTINGS -->
                     <div id="tab-settings-content" class="tab-page hidden">
                         <div class="change-pin-box">
-                            <h2><i class="fa-solid fa-key"></i> Change Admin Security PIN Code</h2>
-                            <p class="pin-box-desc">Apna Admin Access PIN badalne ke liye purana aur naya PIN enter karein:</p>
-
+                            <h2><i class="fa-solid fa-lock"></i> Change Admin Security PIN</h2>
+                            <p class="pin-box-desc">Admin Panel ko secure rakhne ke liye apnay 4-digit PIN code badlein.</p>
+                            
                             <form id="form-change-pin">
                                 <div class="form-group">
-                                    <label for="pin-old">Purana PIN Code (Old PIN):</label>
-                                    <input type="password" id="pin-old" maxlength="6" placeholder="••••" required>
+                                    <label for="pin-old">Current Admin PIN *</label>
+                                    <input type="password" id="pin-old" maxlength="6" required placeholder="Default: 1234">
                                 </div>
-
                                 <div class="form-group">
-                                    <label for="pin-new">Naya PIN Code (New 4-Digit PIN):</label>
-                                    <input type="password" id="pin-new" maxlength="6" placeholder="••••" required>
-                                </div>
-
+                                    <label for="pin-new">New Admin PIN *</label>
+                                    <input type="password" id="pin-new" maxlength="6" required placeholder="Enter new PIN">
+                                0</div>
                                 <div class="form-group">
-                                    <label for="pin-confirm">Naye PIN Ko Confirm Karein:</label>
-                                    <input type="password" id="pin-confirm" maxlength="6" placeholder="••••" required>
+                                    <label for="pin-confirm">Confirm New PIN *</label>
+                                    <input type="password" id="pin-confirm" maxlength="6" required placeholder="Confirm new PIN">
                                 </div>
-
-                                <button type="submit" class="btn btn-emerald btn-block">
-                                    <i class="fa-solid fa-shield"></i> Save New Security PIN
+                                <button type="submit" class="btn btn-gold margin-top-20">
+                                    <i class="fa-solid fa-key"></i> Update Security PIN
                                 </button>
                             </form>
                         </div>
                     </div>
 
                 </section>
-
             </div>
+
         </main>
-
-        <!-- SECURITY PIN MODAL FOR ADMIN ACCESS -->
-        <div id="pin-modal" class="modal-backdrop hidden">
-            <div class="modal-card">
-                <div class="modal-icon"><i class="fa-solid fa-shield-halved"></i></div>
-                <h2>Admin Security Access</h2>
-                <p>Admin Panel open karne ke liye Security PIN daalein:</p>
-                
-                <div class="pin-input-group">
-                    <input type="password" id="pin-input" maxlength="6" placeholder="••••" autocomplete="off">
-                </div>
-                
-                <div class="modal-buttons">
-                    <button id="btn-cancel-pin" class="btn btn-outline">Cancel</button>
-                    <button id="btn-verify-pin" class="btn btn-emerald">Unlock Admin</button>
-                </div>
-            </div>
-        </div>
 
     </div>
 
-    <!-- Application Script -->
+    <!-- SECURITY PIN MODAL -->
+    <div id="pin-modal" class="modal-backdrop hidden">
+        <div class="modal-card">
+            <div class="modal-icon">
+                <i class="fa-solid fa-shield-halved"></i>
+            </div>
+            <h2>Admin Panel Security</h2>
+            <p>Admin Mode open karne ke liye Security PIN enter karein.</p>
+            <div class="pin-input-group">
+                <input type="password" id="pin-input" maxlength="6" placeholder="••••" autofocus>
+            </div>
+            <div class="modal-buttons">
+                <button class="btn btn-outline" id="btn-cancel-pin">Cancel</button>
+                <button class="btn btn-emerald" id="btn-verify-pin">Unlock</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- FULL SCREEN SIGNAL OVERLAY (GREEN/RED ALERT) -->
+    <div id="signal-overlay" class="signal-overlay hidden">
+        <div class="signal-content">
+            <div class="signal-icon" id="signal-icon">
+                <i class="fa-solid fa-circle-check"></i>
+            </div>
+            <h2 id="signal-title">ENTRY GRANTED</h2>
+            <p id="signal-msg">Rs. 25 Deducted | Status: IN TRANSIT</p>
+            <div class="signal-card-info" id="signal-card-info">
+                Passenger: Muhammad Ali
+            </div>
+        </div>
+    </div>
+
+    <!-- PRINTABLE TEMPLATE (HIDDEN FOR PRINT ONLY) -->
+    <div id="printable-card-area" class="printable-area"></div>
+
+    <!-- Main JavaScript App Logic -->
     <script src="app.js"></script>
 
-    <!-- Register PWA Service Worker -->
-    <script>
-        if ('serviceWorker' in navigator) {
-            window.addEventListener('load', () => {
-                navigator.serviceWorker.register('./sw.js')
-                    .then(reg => console.log('🟢 PWA Service Worker Registered!'))
-                    .catch(err => console.log('PWA SW Register Error:', err));
-            });
-        }
-    </script>
 </body>
 </html>
