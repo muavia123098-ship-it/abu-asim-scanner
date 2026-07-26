@@ -1,6 +1,6 @@
 /* ==========================================================================
    Karachi Green Line BRT - Smart QR Ticket & Reusable Card System
-   Bulletproof Mobile Camera Initialization & Resource Conflict Fix
+   HD 60 FPS Camera Scanner & Full-Frame Instant Recognition Tuning
    ========================================================================== */
 
 document.addEventListener('DOMContentLoaded', () => {
@@ -355,7 +355,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         } else {
             if (card.status !== 'IN_TRANSIT') {
-                triggerSignalResult(false, 'NO ENTRY RECORD', `${card.name} Ka Entry Record Nahi Mila!`);
+                triggerSignalResult(false, 'NO ENTRY RECORD', `${card.name} Ka Entry Record Mila!`);
                 addScanHistoryLog(card.id, card.name, 'DENIED - NO ENTRY LOG', 0);
                 return;
             }
@@ -434,7 +434,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // ----------------------------------------------------------------------
-    // 6. BULLETPROOF MOBILE CAMERA INITIALIZATION (FAIL-SAFE & FALLBACKS)
+    // 6. HIGH-RESOLUTION HD 60 FPS ULTRA FAST QR SCANNER ENGINE
     // ----------------------------------------------------------------------
     function startGuardCameraScanner() {
         if (typeof Html5Qrcode === 'undefined') return;
@@ -449,28 +449,52 @@ document.addEventListener('DOMContentLoaded', () => {
             });
         }
 
-        const config = {
-            fps: 30,
+        const cameraConfig = {
+            fps: 60,
+            qrbox: (viewfinderWidth, viewfinderHeight) => {
+                return {
+                    width: Math.floor(viewfinderWidth * 0.95),
+                    height: Math.floor(viewfinderHeight * 0.95)
+                };
+            },
             disableFlip: false
         };
 
-        // Directly start environment camera without prior getUserMedia lock
+        const cameraConstraints = {
+            facingMode: "environment",
+            width: { ideal: 1920 },
+            height: { ideal: 1080 }
+        };
+
         html5QrCodeGuard.start(
-            { facingMode: "environment" },
-            config,
+            cameraConstraints,
+            cameraConfig,
             (decodedText) => processGuardScan(decodedText),
             (err) => {}
         ).then(() => {
             state.scannerActive = true;
             document.getElementById('btn-start-camera').classList.add('hidden');
             document.getElementById('btn-stop-camera').classList.remove('hidden');
+
+            try {
+                const videoEl = document.querySelector("#reader video");
+                if (videoEl && videoEl.srcObject) {
+                    const track = videoEl.srcObject.getVideoTracks()[0];
+                    if (track && track.getCapabilities) {
+                        const caps = track.getCapabilities();
+                        if (caps.focusMode && caps.focusMode.includes('continuous')) {
+                            track.applyConstraints({ advanced: [{ focusMode: 'continuous' }] }).catch(e => {});
+                        }
+                    }
+                }
+            } catch(e) {}
+
         }).catch(err => {
-            console.warn("Environment camera start error, trying default camera:", err);
+            console.warn("HD camera start error, trying default environment mode:", err);
             
-            // Fallback 1: Try default video device
             html5QrCodeGuard.start(
-                { facingMode: "user" },
-                config,
+                { facingMode: "environment" },
+                { fps: 40, disableFlip: false },
                 (decodedText) => processGuardScan(decodedText),
                 (err) => {}
             ).then(() => {
@@ -479,7 +503,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 document.getElementById('btn-stop-camera').classList.remove('hidden');
             }).catch(fallbackErr => {
                 console.error("All camera start attempts failed:", fallbackErr);
-                alert("🎥 Camera Open Alert:\n\nChrome Browser mein Lock 🔒 icon dabayein -> Camera Permission ko RESET/ALLOW karke page reload karein!");
+                alert("🎥 Camera Open Alert:\n\nChrome Browser mein Lock 🔒 icon dabayein -> Camera Permission ko ALLOW karke page reload karein!");
             });
         });
     }
@@ -507,14 +531,21 @@ document.addEventListener('DOMContentLoaded', () => {
             });
         }
 
-        const config = {
-            fps: 30,
+        const cameraConfig = {
+            fps: 60,
+            qrbox: (w, h) => ({ width: Math.floor(w * 0.95), height: Math.floor(h * 0.95) }),
             disableFlip: false
         };
 
+        const cameraConstraints = {
+            facingMode: "environment",
+            width: { ideal: 1920 },
+            height: { ideal: 1080 }
+        };
+
         html5QrCodeRecharge.start(
-            { facingMode: "environment" },
-            config,
+            cameraConstraints,
+            cameraConfig,
             (decodedText) => {
                 fetchCardForRecharge(decodedText);
                 playGrantedSound();
@@ -526,8 +557,8 @@ document.addEventListener('DOMContentLoaded', () => {
             document.getElementById('btn-recharge-camera-stop').classList.remove('hidden');
         }).catch(err => {
             html5QrCodeRecharge.start(
-                { facingMode: "user" },
-                config,
+                { facingMode: "environment" },
+                { fps: 40, disableFlip: false },
                 (decodedText) => {
                     fetchCardForRecharge(decodedText);
                     playGrantedSound();

@@ -1,7 +1,6 @@
 /* ==========================================================================
    Karachi Green Line BRT - Smart QR Ticket & Reusable Card System
-   Theme: Vibrant Emerald Green, Deep Slate Navy, Glassmorphism, Signal Red/Green
-   Strict Mobile Responsive Overrides (Vertical Admin Menu & Zero Horizontal Zoom)
+   HD Camera Feed & Instant 60 FPS QR Scanner Tuning
    ========================================================================== */
 
 :root {
@@ -272,7 +271,7 @@ html, body {
     position: relative;
     width: 100%;
     max-width: 550px;
-    height: 320px;
+    height: 340px;
     background: #000;
     border-radius: var(--radius-md);
     overflow: hidden;
@@ -284,7 +283,7 @@ html, body {
 }
 
 .scanner-frame-wrapper.small-frame {
-    height: 240px;
+    height: 250px;
 }
 
 #reader, #recharge-reader {
@@ -307,12 +306,13 @@ html, body {
     height: 0 !important;
 }
 
+/* Sharp HD Video feed without blur or pixelation filters */
 #reader video, #recharge-reader video {
     width: 100% !important;
     height: 100% !important;
     object-fit: cover !important;
-    filter: contrast(135%) brightness(108%) saturate(120%);
-    image-rendering: pixelated;
+    filter: contrast(106%) brightness(103%) !important;
+    image-rendering: auto !important;
 }
 
 .scan-laser {
@@ -971,7 +971,7 @@ html, body {
 .modal-buttons .btn { flex: 1; }
 
 /* ==========================================
-   STRICT MOBILE RESPONSIVE OVERRIDES (VERTICAL MENU & NO HORIZONTAL ZOOM)
+   STRICT MOBILE RESPONSIVE OVERRIDES
    ========================================== */
 @media (max-width: 768px) {
     html, body, .app-container, .admin-layout, .admin-content, .tab-page {
@@ -1020,7 +1020,6 @@ html, body {
         width: 100% !important;
     }
 
-    /* VERTICAL ADMIN MENU (ONE ITEM PER ROW ON MOBILE) */
     .sidebar-menu {
         display: flex !important;
         flex-direction: column !important;
