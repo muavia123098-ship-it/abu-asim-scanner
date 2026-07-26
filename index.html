@@ -5,6 +5,9 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Karachi Green Line BRT - Smart Ticket & Reusable Pass System</title>
     
+    <!-- Favicon (Fixes 404 Favicon Error in Browser Console) -->
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🚌</text></svg>">
+
     <!-- PWA & Mobile Web App Capabilities -->
     <link rel="manifest" href="manifest.json">
     <meta name="theme-color" content="#090e17">
@@ -352,7 +355,7 @@
                     <!-- TAB 4: ALL ISSUED QR CODES GALLERY -->
                     <div id="tab-gallery-content" class="tab-page hidden">
                         <div class="qr-gallery-section">
-                            2<h2><i class="fa-solid fa-qrcode"></i> All Passenger QR Code Gallery</h2>
+                            <h2><i class="fa-solid fa-qrcode"></i> All Passenger QR Code Gallery</h2>
                             <p class="gallery-desc">Tamaam issued cards ke QR Codes direct scan & testing ke liye yahan available hain.</p>
                             <div class="qr-gallery-grid" id="qr-gallery-grid">
                                 <!-- Dynamic JS Cards Gallery -->
@@ -374,7 +377,7 @@
                                 <div class="form-group">
                                     <label for="pin-new">New Admin PIN *</label>
                                     <input type="password" id="pin-new" maxlength="6" required placeholder="Enter new PIN">
-                                0</div>
+                                </div>
                                 <div class="form-group">
                                     <label for="pin-confirm">Confirm New PIN *</label>
                                     <input type="password" id="pin-confirm" maxlength="6" required placeholder="Confirm new PIN">

@@ -1,6 +1,6 @@
 /* ==========================================================================
    Karachi Green Line BRT - Smart QR Ticket & Reusable Card System
-   Root Cause Fix: Safe Null/Undefined Check for c.id.trim() in processGuardScan
+   Apple-Style Dot QR Code Generator & Permanent Card Deletion Engine
    ========================================================================== */
 
 document.addEventListener('DOMContentLoaded', () => {
@@ -269,6 +269,36 @@ document.addEventListener('DOMContentLoaded', () => {
         .catch(err => {});
     }
 
+    function deleteCardPermanently(cardId) {
+        const card = state.cards.find(c => c && c.id === cardId);
+        if (!card) return;
+
+        if (confirm(`⚠️ PERMANENT DELETE CONFIRMATION:\nKya aap Card "${card.id}" (${card.name}) ko HAMESHA ke liye system aur Cloud se delete karna chahte hain?`)) {
+            state.cards = state.cards.filter(c => c && c.id !== cardId);
+
+            if (state.activeCardId === cardId) {
+                state.activeCardId = null;
+            }
+
+            saveLocalStorageBackup();
+
+            if (isCloudOnline && db) {
+                db.collection("cards").doc(cardId).delete()
+                    .then(() => console.log(`🟢 Firestore Deleted: ${cardId}`))
+                    .catch(err => console.warn("Firestore delete info:", err));
+            }
+
+            fetch(`${FIRESTORE_REST_ENDPOINT}/${cardId}`, {
+                method: 'DELETE'
+            }).then(() => console.log(`🟢 Firestore REST Deleted: ${cardId}`))
+            .catch(err => {});
+
+            playGrantedSound();
+            renderApp();
+            alert(`✅ CARD ${cardId} PERMANENTLY DELETED FROM CLOUD & LOCAL DB!`);
+        }
+    }
+
     // ----------------------------------------------------------------------
     // 3. SOUND SYNTHESIZER
     // ----------------------------------------------------------------------
@@ -335,7 +365,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // ----------------------------------------------------------------------
-    // 4. QR CODE GENERATOR UTILITY
+    // 4. APPLE-STYLE ROUNDED DOT QR CODE GENERATOR ENGINE
     // ----------------------------------------------------------------------
     function generateQRCode(elementId, textData, size = 100) {
         const container = document.getElementById(elementId);
@@ -343,7 +373,11 @@ document.addEventListener('DOMContentLoaded', () => {
         container.innerHTML = '';
 
         if (typeof QRCode !== 'undefined') {
-            new QRCode(container, {
+            const tempDiv = document.createElement('div');
+            tempDiv.style.display = 'none';
+            document.body.appendChild(tempDiv);
+
+            new QRCode(tempDiv, {
                 text: textData,
                 width: size,
                 height: size,
@@ -351,6 +385,76 @@ document.addEventListener('DOMContentLoaded', () => {
                 colorLight: "#ffffff",
                 correctLevel: QRCode.CorrectLevel.H
             });
+
+            setTimeout(() => {
+                const origCanvas = tempDiv.querySelector('canvas');
+                if (origCanvas) {
+                    const dotCanvas = document.createElement('canvas');
+                    dotCanvas.width = size;
+                    dotCanvas.height = size;
+                    const ctx = dotCanvas.getContext('2d');
+
+                    const origCtx = origCanvas.getContext('2d');
+                    const imgData = origCtx.getImageData(0, 0, origCanvas.width, origCanvas.height);
+                    const pixels = imgData.data;
+                    const w = origCanvas.width;
+                    const h = origCanvas.height;
+
+                    // Clean white background
+                    ctx.fillStyle = '#ffffff';
+                    ctx.fillRect(0, 0, size, size);
+
+                    // Estimate grid columns
+                    let sampleStep = 1;
+                    for (let x = 0; x < w; x++) {
+                        const idx = (0 * w + x) * 4;
+                        if (pixels[idx] < 50) sampleStep++;
+                        else if (sampleStep > 1) break;
+                    }
+
+                    const cols = Math.round(w / sampleStep) || 29;
+                    const cellSize = size / cols;
+                    const radius = (cellSize / 2) * 0.88;
+
+                    // Render Apple-style rounded dots
+                    ctx.fillStyle = '#090e17';
+
+                    for (let r = 0; r < cols; r++) {
+                        for (let c = 0; c < cols; c++) {
+                            const px = Math.floor((r + 0.5) * (w / cols));
+                            const py = Math.floor((c + 0.5) * (h / cols));
+                            const idx = (py * w + px) * 4;
+
+                            if (pixels[idx] < 120) {
+                                const cx = (r + 0.5) * cellSize;
+                                const cy = (c + 0.5) * cellSize;
+
+                                // Finder pattern corner zones (Top-Left, Top-Right, Bottom-Left)
+                                const isFinderTL = (r < 7 && c < 7);
+                                const isFinderTR = (r >= cols - 7 && c < 7);
+                                const isFinderBL = (r < 7 && c >= cols - 7);
+
+                                if (isFinderTL || isFinderTR || isFinderBL) {
+                                    // Smooth rounded module squares for corner finders
+                                    ctx.beginPath();
+                                    ctx.roundRect(r * cellSize + 0.5, c * cellSize + 0.5, cellSize - 0.8, cellSize - 0.8, 2);
+                                    ctx.fill();
+                                } else {
+                                    // Apple-Style Smooth Circular Dots
+                                    ctx.beginPath();
+                                    ctx.arc(cx, cy, radius, 0, Math.PI * 2);
+                                    ctx.fill();
+                                }
+                            }
+                        }
+                    }
+
+                    container.appendChild(dotCanvas);
+                } else {
+                    container.innerHTML = `<div style="padding:8px; background:#fff; color:#000; font-size:9px; word-break:break-all; text-align:center;"><b>${textData}</b></div>`;
+                }
+                tempDiv.remove();
+            }, 40);
         } else {
             container.innerHTML = `<div style="padding:8px; background:#fff; color:#000; font-size:9px; word-break:break-all; text-align:center;"><b>${textData}</b></div>`;
         }
@@ -369,7 +473,6 @@ document.addEventListener('DOMContentLoaded', () => {
         const cardId = rawText.trim();
         console.log("🟢 QR Code Decoded:", cardId);
 
-        // Safe null/undefined check for c.id before trim
         const card = state.cards.find(c => 
             c && c.id && typeof c.id === 'string' && c.id.trim().toUpperCase() === cardId.toUpperCase()
         );
@@ -598,7 +701,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // ----------------------------------------------------------------------
-    // 7. DEDICATED RECHARGE TOOL LOGIC (SAFE NULL-CHECKED FETCH)
+    // 7. DEDICATED RECHARGE TOOL LOGIC
     // ----------------------------------------------------------------------
     function fetchCardForRecharge(cardId) {
         if (!cardId || typeof cardId !== 'string') {
@@ -723,6 +826,11 @@ document.addEventListener('DOMContentLoaded', () => {
                                 <span class="bal-badge" style="color: ${bal >= FARE_PER_SCAN ? '#00e676' : '#ff1744'};">
                                     Balance: Rs. ${bal}
                                 </span>
+                                <div style="margin-top:6px;">
+                                    <button class="btn btn-outline btn-delete-card" data-card-id="${c.id}" style="padding:3px 8px; font-size:0.7rem; color:#ff1744; border-color:rgba(255,23,68,0.4);">
+                                        <i class="fa-solid fa-trash"></i> Delete
+                                    </button>
+                                </div>
                             </div>
                         </div>
                     `;
@@ -730,6 +838,13 @@ document.addEventListener('DOMContentLoaded', () => {
 
                 state.cards.forEach(c => {
                     if (c && c.id) generateQRCode(`gallery-qr-${c.id}`, c.id, 140);
+                });
+
+                galleryGrid.querySelectorAll('.btn-delete-card').forEach(btn => {
+                    btn.addEventListener('click', () => {
+                        const id = btn.getAttribute('data-card-id');
+                        deleteCardPermanently(id);
+                    });
                 });
             }
         }
@@ -754,8 +869,11 @@ document.addEventListener('DOMContentLoaded', () => {
                                 </span>
                             </td>
                             <td>
-                                <button class="btn btn-outline btn-view-card" data-card-id="${c.id}" style="padding:4px 10px; font-size:0.75rem;">
-                                    <i class="fa-solid fa-qrcode"></i> View Card
+                                <button class="btn btn-outline btn-view-card" data-card-id="${c.id}" style="padding:4px 8px; font-size:0.75rem;">
+                                    <i class="fa-solid fa-qrcode"></i> View
+                                </button>
+                                <button class="btn btn-outline btn-delete-card" data-card-id="${c.id}" style="padding:4px 8px; font-size:0.75rem; color:#ff1744; border-color:rgba(255,23,68,0.4); margin-left:4px;">
+                                    <i class="fa-solid fa-trash"></i> Delete
                                 </button>
                             </td>
                         </tr>
@@ -767,6 +885,13 @@ document.addEventListener('DOMContentLoaded', () => {
                         const id = btn.getAttribute('data-card-id');
                         switchAdminTab('issue');
                         displayCardPreview(id);
+                    });
+                });
+
+                tbody.querySelectorAll('.btn-delete-card').forEach(btn => {
+                    btn.addEventListener('click', () => {
+                        const id = btn.getAttribute('data-card-id');
+                        deleteCardPermanently(id);
                     });
                 });
             }

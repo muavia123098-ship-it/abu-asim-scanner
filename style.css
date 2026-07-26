@@ -1,6 +1,6 @@
 /* ==========================================================================
    Karachi Green Line BRT - Smart QR Ticket & Reusable Card System
-   100% Perfect Camera Feed Alignment & Zero Aspect Ratio Distortion
+   Tablet & Mobile Screen Table Fitting & Compact Layout Overrides
    ========================================================================== */
 
 :root {
@@ -267,7 +267,6 @@ html, body {
     gap: 14px;
 }
 
-/* Dynamic Aspect Ratio Wrapper for Perfect Camera Alignment */
 .scanner-frame-wrapper {
     position: relative;
     width: 100%;
@@ -296,7 +295,6 @@ html, body {
     display: none !important;
 }
 
-/* Perfect Uncropped Camera Video Rendering */
 #reader video, #recharge-reader video {
     width: 100% !important;
     height: auto !important;
@@ -529,7 +527,7 @@ html, body {
 /* STATS & ISSUE GRID */
 .stats-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
     gap: 12px;
     width: 100%;
 }
@@ -946,7 +944,7 @@ html, body {
 .modal-buttons .btn { flex: 1; }
 
 /* ==========================================
-   STRICT MOBILE RESPONSIVE OVERRIDES
+   STRICT TABLET & MOBILE RESPONSIVE OVERRIDES
    ========================================== */
 @media (max-width: 768px) {
     html, body, .app-container, .admin-layout, .admin-content, .tab-page {
@@ -1012,25 +1010,59 @@ html, body {
         word-break: break-word !important;
     }
 
+    /* 1-Row Compact Horizontal Stats Grid for Mobile & Tablet */
     .stats-grid {
-        grid-template-columns: 1fr !important;
-        gap: 10px !important;
+        grid-template-columns: repeat(3, 1fr) !important;
+        gap: 8px !important;
     }
 
     .stat-card {
-        padding: 12px !important;
-        gap: 10px !important;
+        padding: 8px 10px !important;
+        gap: 8px !important;
         width: 100% !important;
+        flex-direction: column !important;
+        text-align: center !important;
     }
 
     .stat-icon {
-        width: 38px !important;
-        height: 38px !important;
-        font-size: 1.1rem !important;
+        width: 32px !important;
+        height: 32px !important;
+        font-size: 0.95rem !important;
+        border-radius: 8px !important;
+    }
+
+    .stat-data .stat-label {
+        font-size: 0.65rem !important;
     }
 
     .stat-data h3 {
-        font-size: 1.1rem !important;
+        font-size: 1rem !important;
+    }
+
+    /* 100% Perfectly Fitted Tablet & Mobile Table */
+    .cards-table-container {
+        padding: 10px !important;
+        width: 100% !important;
+    }
+
+    .data-table {
+        font-size: 0.72rem !important;
+        width: 100% !important;
+    }
+
+    .data-table th, .data-table td {
+        padding: 6px 4px !important;
+        white-space: normal !important;
+        word-break: break-word !important;
+    }
+
+    .data-table th:nth-child(3), .data-table td:nth-child(3) {
+        display: none !important; /* Hide Phone column on mobile/tablet to give 100% space to Name, Balance, Status & Action */
+    }
+
+    .data-table td .btn {
+        padding: 3px 5px !important;
+        font-size: 0.65rem !important;
     }
 
     .recharge-select-row {
@@ -1040,10 +1072,6 @@ html, body {
 }
 
 @media (max-width: 480px) {
-    .stats-grid {
-        grid-template-columns: 1fr !important;
-    }
-
     .smart-pvc-card {
         padding: 12px !important;
         min-height: 200px !important;
